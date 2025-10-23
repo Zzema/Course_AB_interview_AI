@@ -62,7 +62,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({
         }
 
         // Версия структуры лидерборда (увеличиваем при изменении LEADERBOARD_DATA)
-        const LEADERBOARD_VERSION = 4; // Увеличили версию для поддержки recent rating
+        const LEADERBOARD_VERSION = 5; // Увеличили версию для полного имени (Фамилия Имя)
         const storageKey = leaderboardType === 'recent' ? 'leaderboard-scores-recent' : 'leaderboard-scores';
         const versionKey = `${storageKey}-version`;
         const savedVersion = localStorage.getItem(versionKey);
@@ -80,12 +80,16 @@ const Leaderboard: React.FC<LeaderboardProps> = ({
             : [...LEADERBOARD_DATA.map(entry => ({ ...entry, isCurrentUser: false, difficulty: 'mid' }))];
 
         // Обновляем или добавляем текущего пользователя
+        const fullName = currentUser.family_name 
+            ? `${currentUser.family_name} ${currentUser.given_name}` 
+            : currentUser.name;
+        
         const existingUserIndex = allScores.findIndex(
-            entry => entry.name === currentUser.given_name || entry.name === currentUser.name
+            entry => entry.name === fullName || entry.name === currentUser.given_name || entry.name === currentUser.name
         );
 
         const currentUserEntry: LeaderboardEntry = {
-            name: currentUser.given_name || currentUser.name,
+            name: fullName,
             score: currentRating,
             isCurrentUser: true,
             ratingHistory: currentRatingHistory,
