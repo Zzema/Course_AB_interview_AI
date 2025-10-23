@@ -196,9 +196,17 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
                         </p>
                         <p style={{
                             color: 'var(--text-secondary)', 
-                            fontSize: isMobile ? '0.85rem' : '0.95rem'
+                            fontSize: isMobile ? '0.85rem' : '0.95rem',
+                            marginBottom: '0.25rem'
                         }}>
-                            Выберите свой текущий уровень для начала тренировки
+                            Выберите целевую позицию для подготовки
+                        </p>
+                        <p style={{
+                            color: 'rgba(139, 92, 246, 0.8)', 
+                            fontSize: isMobile ? '0.75rem' : '0.85rem',
+                            fontStyle: 'italic'
+                        }}>
+                            Это определит сложность вопросов. Ваш уровень мастерства будет расти по мере прохождения.
                         </p>
                     </div>
                     
@@ -218,10 +226,10 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
                         width: '100%'
                     }}>
                         {[
-                            { value: 'junior', icon: '🌱', label: 'Junior', desc: 'Базовые знания' },
-                            { value: 'mid', icon: '⭐', label: 'Mid', desc: 'Уверенные навыки' },
-                            { value: 'senior', icon: '💎', label: 'Senior', desc: 'Экспертный уровень' },
-                            { value: 'staff', icon: '👑', label: 'Staff', desc: 'Лидерство' }
+                            { value: 'junior', icon: '🌱', label: 'Junior', desc: 'Базовые вопросы' },
+                            { value: 'mid', icon: '⭐', label: 'Middle', desc: 'Средний уровень' },
+                            { value: 'senior', icon: '💎', label: 'Senior', desc: 'Сложные кейсы' },
+                            { value: 'staff', icon: '👑', label: 'Staff', desc: 'Экспертные темы' }
                         ].map(level => (
                             <button
                                 key={level.value}

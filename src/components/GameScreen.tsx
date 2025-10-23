@@ -7,6 +7,7 @@ import { styles } from '../styles';
 import { createInitialGameState } from '../lib/api';
 import ProgressBar from './ProgressBar';
 import FeedbackOverlay from './FeedbackOverlay';
+import { calculateXP } from '../lib/xpCalculator';
 
 interface GameScreenProps {
     user: User;
@@ -34,7 +35,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ user, onLogout, gameState, setG
     const [answer, setAnswer] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [feedback, setFeedback] = useState<Feedback | null>(null);
-    const [lastEarnedPoints, setLastEarnedPoints] = useState<number>(0);
+    const [lastEarnedXP, setLastEarnedXP] = useState<number>(0);
     const [levelUpNotification, setLevelUpNotification] = useState<string | null>(null);
     const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
 
@@ -318,33 +319,26 @@ const GameScreen: React.FC<GameScreenProps> = ({ user, onLogout, gameState, setG
                 newStreak = 0;
             }
             
-            // Calculate rating with difficulty and quality bonuses
-            const difficultyMultiplier = 1 + (currentQuestion.difficulty - 5) * 0.1;
-            const basePoints = parsedFeedback.overallScore * difficultyMultiplier;
+            // Calculate XP using new system
+            const xpResult = calculateXP(parsedFeedback.overallScore, currentQuestion.difficulty);
+            const earnedXP = xpResult.earnedXP;
             
-            let qualityBonus = 0;
-            if (parsedFeedback.overallScore >= 8) {
-                qualityBonus = 5;  // Отличный ответ
-            } else if (parsedFeedback.overallScore >= 6) {
-                qualityBonus = 2;  // Хороший ответ
-            }
+            // Update rating with earned XP
+            const newRating = gameState.rating + earnedXP;
             
-            const earnedPoints = Math.round(basePoints + qualityBonus);
-            const newRating = gameState.rating + earnedPoints;
+            // Save earned XP for display in feedback
+            setLastEarnedXP(earnedXP);
             
-            // Save earned points for display in feedback
-            setLastEarnedPoints(earnedPoints);
-            
-            // Update rating history
+            // Update histories
             const newRatingHistory = [...(gameState.ratingHistory || [0]), newRating];
             
-            // 🆕 Сохраняем попытку ответа на вопрос
+            // Сохраняем попытку ответа на вопрос
             const questionAttempt = {
                 questionId: currentQuestion.id,
                 timestamp: Date.now(),
                 answer: answer,
                 feedback: parsedFeedback,
-                earnedPoints: earnedPoints,
+                earnedXP: earnedXP,
                 difficulty: currentQuestion.difficulty,
                 seniority: currentQuestion.seniority,
             };
@@ -358,7 +352,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ user, onLogout, gameState, setG
                 keyPointScores: newKeyPointScores,
                 consecutiveGoodAnswersOnSimpleQuestions: newStreak,
                 ratingHistory: newRatingHistory,
-                questionAttempts: newQuestionAttempts, // 🆕
+                questionAttempts: newQuestionAttempts,
             });
 
         } catch (error: any) {
@@ -448,7 +442,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ user, onLogout, gameState, setG
                         Пройдены все уровни: 🌱 Junior → ⭐ Mid → 💎 Senior → 👑 Staff
                     </p>
                     <p style={{fontSize: '2rem', margin: '1rem 0'}}>
-                        Ваш итоговый рейтинг: 
+                        Ваш итоговый опыт: 
                     </p>
                     <p style={{fontSize: '3rem', fontWeight: 'bold', color: 'var(--primary-color)', margin: '0.5rem 0'}}>
                         {gameState.rating}
@@ -456,14 +450,6 @@ const GameScreen: React.FC<GameScreenProps> = ({ user, onLogout, gameState, setG
                     <p style={{fontSize: '1rem', color: 'var(--text-secondary)', marginTop: '1rem'}}>
                         Пройдено вопросов: {totalAsked}
                     </p>
-                </div>
-                <div style={{display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap'}}>
-                    <button 
-                        onClick={() => setGameState(createInitialGameState())} 
-                        style={styles.submitButton}
-                    >
-                        🔄 Начать заново
-                </button>
                 </div>
             </div>
         )
@@ -479,7 +465,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ user, onLogout, gameState, setG
                 alignItems: 'stretch',
                 flexWrap: 'nowrap'
             }}>
-                {/* Первая строка: Рейтинг + Уровень + Кнопки */}
+                {/* Первая строка: Опыт + Уровень + Кнопки */}
                 <div style={{
                     display: 'flex', 
                     alignItems: 'center', 
@@ -487,7 +473,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ user, onLogout, gameState, setG
                     gap: isMobile ? '0.5rem' : '1rem',
                     width: '100%'
                 }}>
-                    {/* Рейтинг и уровень в одной строке на мобилке */}
+                    {/* Опыт и уровень в одной строке на мобилке */}
                     <div style={{
                         display: 'flex', 
                         alignItems: 'center', 
@@ -499,7 +485,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ user, onLogout, gameState, setG
                             ...styles.rating, 
                             fontSize: isMobile ? '1.1rem' : '1.5rem',
                             whiteSpace: 'nowrap'
-                        }} title="Рейтинг рассчитывается с учетом сложности вопросов и качества ответов">
+                        }} title="Опыт рассчитывается с учетом сложности вопросов и качества ответов">
                             🏆 {gameState.rating}
                         </div>
                         <div style={{
@@ -627,15 +613,25 @@ const GameScreen: React.FC<GameScreenProps> = ({ user, onLogout, gameState, setG
             <main style={{
                 ...styles.mainContent,
                 padding: isMobile ? '0.75rem' : '1.5rem',
-                gap: isMobile ? '0.75rem' : '1.5rem'
+                gap: isMobile ? '0.75rem' : '1.5rem',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden'
             }}>
                 <div style={{
-                    ...styles.gameScreen,
-                    gap: isMobile ? '0.75rem' : '1.5rem'
+                    display: 'flex',
+                    flexDirection: 'column',
+                    flex: '1 1 auto',
+                    minHeight: 0,
+                    gap: isMobile ? '0.75rem' : '1rem'
                 }} className="fade-in">
+                    {/* Вопрос - фиксированная секция с прокруткой */}
                     <div style={{
                         ...styles.questionCard,
-                        padding: isMobile ? '0.75rem' : '1.5rem'
+                        padding: isMobile ? '0.75rem' : '1.5rem',
+                        flex: '0 0 auto',
+                        maxHeight: '35vh',
+                        overflowY: 'auto'
                     }}>
                         <div style={{
                             ...styles.questionMeta,
@@ -673,7 +669,15 @@ const GameScreen: React.FC<GameScreenProps> = ({ user, onLogout, gameState, setG
                         >
                             {currentQuestion.text}
                         </p>
-                        <div style={{ position: 'relative', width: '100%' }}>
+                    </div>
+
+                    {/* Textarea - растягивается на доступное пространство */}
+                    <div style={{
+                        flex: '1 1 auto',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        minHeight: 0
+                    }}>
                         <textarea
                             value={answer}
                                 onChange={handleAnswerChange}
@@ -681,32 +685,42 @@ const GameScreen: React.FC<GameScreenProps> = ({ user, onLogout, gameState, setG
                             placeholder="Введите ваш развернутый ответ... (минимум 100 символов)"
                             style={{
                                 ...styles.textarea,
-                                minHeight: isMobile ? '120px' : '150px',
+                                flex: '1 1 auto',
+                                minHeight: 0,
+                                height: '100%',
                                 fontSize: isMobile ? '0.9rem' : '1rem',
-                                padding: isMobile ? '0.75rem' : '1rem'
+                                padding: isMobile ? '0.75rem' : '1rem',
+                                resize: 'none'
                             }}
                             disabled={isLoading}
                         />
-                            <div style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                marginTop: '0.5rem',
-                                fontSize: '0.85rem',
-                                padding: '0 0.5rem'
+                    </div>
+
+                    {/* Кнопка и счетчик - зафиксированы внизу */}
+                    <div style={{
+                        flex: '0 0 auto',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.75rem'
+                    }}>
+                        <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            fontSize: isMobile ? '0.75rem' : '0.85rem',
+                            padding: '0 0.25rem'
+                        }}>
+                            <div style={{ 
+                                color: getCharCountInfo().color,
+                                fontWeight: '500'
                             }}>
-                                <div style={{ 
-                                    color: getCharCountInfo().color,
-                                    fontWeight: '500'
-                                }}>
-                                    {getCharCountInfo().message}
-                                </div>
-                                <div style={{ 
-                                    color: getCharCountInfo().color,
-                                    fontWeight: 'bold'
-                                }}>
-                                    {answer.length} / {HARD_MAX_LENGTH}
-                                </div>
+                                {getCharCountInfo().message}
+                            </div>
+                            <div style={{ 
+                                color: getCharCountInfo().color,
+                                fontWeight: 'bold'
+                            }}>
+                                {answer.length} / {HARD_MAX_LENGTH}
                             </div>
                         </div>
                         <button 
@@ -729,9 +743,9 @@ const GameScreen: React.FC<GameScreenProps> = ({ user, onLogout, gameState, setG
             {feedback && <FeedbackOverlay 
                 feedback={feedback} 
                 onNext={handleNextQuestion} 
-                oldRating={gameState.rating - lastEarnedPoints}
+                oldXP={gameState.rating - (lastEarnedXP || 0)}
                 question={currentQuestion}
-                earnedPoints={lastEarnedPoints}
+                earnedXP={lastEarnedXP}
             />}
             
             {/* Level Up Notification */}

@@ -36,6 +36,8 @@ interface LeaderboardProps {
     currentUser?: User;
     currentRating?: number;
     currentRatingHistory?: number[];
+    selectedDifficulty?: 'all' | 'junior' | 'mid' | 'senior' | 'staff';
+    leaderboardType?: 'overall' | 'recent'; // Тип рейтинга (общий или за последние 20 вопросов)
 }
 
 interface LeaderboardEntry {
@@ -43,9 +45,16 @@ interface LeaderboardEntry {
     score: number;
     isCurrentUser?: boolean;
     ratingHistory?: number[];
+    difficulty?: 'junior' | 'mid' | 'senior' | 'staff';
 }
 
-const Leaderboard: React.FC<LeaderboardProps> = ({ currentUser, currentRating, currentRatingHistory }) => {
+const Leaderboard: React.FC<LeaderboardProps> = ({ 
+    currentUser, 
+    currentRating, 
+    currentRatingHistory,
+    selectedDifficulty = 'mid',
+    leaderboardType = 'overall'
+}) => {
     const leaderboardData = useMemo(() => {
         // Если нет текущего пользователя или рейтинга, показываем статические данные
         if (!currentUser || currentRating === undefined) {
@@ -53,21 +62,22 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ currentUser, currentRating, c
         }
 
         // Версия структуры лидерборда (увеличиваем при изменении LEADERBOARD_DATA)
-        const LEADERBOARD_VERSION = 2;
-        const versionKey = 'leaderboard-version';
+        const LEADERBOARD_VERSION = 4; // Увеличили версию для поддержки recent rating
+        const storageKey = leaderboardType === 'recent' ? 'leaderboard-scores-recent' : 'leaderboard-scores';
+        const versionKey = `${storageKey}-version`;
         const savedVersion = localStorage.getItem(versionKey);
         
         // Если версия изменилась или не существует - сбрасываем старые данные
         if (!savedVersion || parseInt(savedVersion) !== LEADERBOARD_VERSION) {
-            localStorage.removeItem('leaderboard-scores');
+            localStorage.removeItem(storageKey);
             localStorage.setItem(versionKey, LEADERBOARD_VERSION.toString());
         }
 
         // Получаем сохраненные результаты из localStorage
-        const savedScores = localStorage.getItem('leaderboard-scores');
+        const savedScores = localStorage.getItem(storageKey);
         let allScores: LeaderboardEntry[] = savedScores 
             ? JSON.parse(savedScores) 
-            : [...LEADERBOARD_DATA.map(entry => ({ ...entry, isCurrentUser: false }))];
+            : [...LEADERBOARD_DATA.map(entry => ({ ...entry, isCurrentUser: false, difficulty: 'mid' }))];
 
         // Обновляем или добавляем текущего пользователя
         const existingUserIndex = allScores.findIndex(
@@ -78,7 +88,8 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ currentUser, currentRating, c
             name: currentUser.given_name || currentUser.name,
             score: currentRating,
             isCurrentUser: true,
-            ratingHistory: currentRatingHistory
+            ratingHistory: currentRatingHistory,
+            difficulty: selectedDifficulty === 'all' ? 'mid' : selectedDifficulty
         };
 
         if (existingUserIndex !== -1) {
@@ -89,58 +100,94 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ currentUser, currentRating, c
             allScores.push(currentUserEntry);
         }
 
-        // Сортируем по убыванию рейтинга и берем топ-10
-        const sortedScores = allScores
+        // Фильтруем по selectedDifficulty (если не 'all') и сортируем по убыванию рейтинга
+        const filteredScores = allScores
+            .filter(entry => selectedDifficulty === 'all' || entry.difficulty === selectedDifficulty)
             .sort((a, b) => b.score - a.score)
             .slice(0, 10);
 
-        // Сохраняем обновленный лидерборд
-        localStorage.setItem('leaderboard-scores', JSON.stringify(sortedScores));
+        // Сохраняем обновленный лидерборд (всех пользователей, не только отфильтрованных)
+        localStorage.setItem(storageKey, JSON.stringify(allScores));
 
-        return sortedScores;
-    }, [currentUser, currentRating, currentRatingHistory]);
+        return filteredScores;
+    }, [currentUser, currentRating, currentRatingHistory, selectedDifficulty, leaderboardType]);
+
+    const difficultyLabel = {
+        all: 'Все уровни',
+        junior: 'Junior',
+        mid: 'Middle',
+        senior: 'Senior',
+        staff: 'Staff'
+    }[selectedDifficulty || 'mid'];
 
     return (
         <div style={styles.questionCard}>
             <h3 style={{ marginBottom: '1rem', fontFamily: 'var(--font-display)', color: 'var(--secondary-color)' }}>
                 Таблица лидеров
             </h3>
+            <div style={{ 
+                fontSize: '0.85rem', 
+                color: 'var(--text-secondary)', 
+                marginBottom: '0.75rem',
+                fontStyle: 'italic'
+            }}>
+                🎯 Уровень: {difficultyLabel} Analyst
+            </div>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <tbody>
-                    {leaderboardData.map((player, index) => (
-                        <tr 
-                            key={`${player.name}-${index}`} 
-                            style={{ 
-                                borderBottom: index < leaderboardData.length - 1 ? '1px solid var(--border-color)' : 'none',
-                                backgroundColor: player.isCurrentUser ? 'rgba(106, 90, 205, 0.1)' : 'transparent'
-                            }}
-                        >
-                            <td style={{ 
-                                padding: '0.75rem 0.5rem',
-                                fontWeight: player.isCurrentUser ? 'bold' : 'normal'
-                            }}>
-                                {index + 1}. {player.name} {player.isCurrentUser && '👤'}
-                            </td>
-                            <td style={{ 
-                                padding: '0.75rem 0.5rem', 
-                                textAlign: 'center',
-                                width: '80px'
-                            }}>
-                                {player.ratingHistory && player.ratingHistory.length > 1 && (
-                                    <MiniSparkline history={player.ratingHistory} />
+                    {leaderboardData.map((player, index) => {
+                        const levelIcons = {
+                            junior: '🌱',
+                            mid: '⭐',
+                            senior: '💎',
+                            staff: '👑'
+                        };
+                        
+                        return (
+                            <tr 
+                                key={`${player.name}-${index}`} 
+                                style={{ 
+                                    borderBottom: index < leaderboardData.length - 1 ? '1px solid var(--border-color)' : 'none',
+                                    backgroundColor: player.isCurrentUser ? 'rgba(106, 90, 205, 0.1)' : 'transparent'
+                                }}
+                            >
+                                <td style={{ 
+                                    padding: '0.75rem 0.5rem',
+                                    fontWeight: player.isCurrentUser ? 'bold' : 'normal'
+                                }}>
+                                    {index + 1}. {player.name} {player.isCurrentUser && '👤'}
+                                </td>
+                                {selectedDifficulty === 'all' && (
+                                    <td style={{
+                                        padding: '0.75rem 0.5rem',
+                                        textAlign: 'center',
+                                        fontSize: '1.2rem',
+                                        width: '40px'
+                                    }}>
+                                        {levelIcons[player.difficulty || 'mid']}
+                                    </td>
                                 )}
-                            </td>
-                            <td style={{ 
-                                padding: '0.75rem 0.5rem', 
-                                textAlign: 'right', 
-                                color: 'var(--primary-color)', 
-                                fontWeight: 'bold',
-                                width: '60px'
-                            }}>
-                                {player.score}
-                            </td>
-                        </tr>
-                    ))}
+                                <td style={{ 
+                                    padding: '0.75rem 0.5rem', 
+                                    textAlign: 'center',
+                                    width: '80px'
+                                }}>
+                                    {player.ratingHistory && player.ratingHistory.length > 1 && (
+                                        <MiniSparkline history={player.ratingHistory} />
+                                    )}
+                                </td>
+                                <td style={{ 
+                                    padding: '0.75rem 0.5rem', 
+                                    textAlign: 'right', 
+                                    color: 'var(--primary-color)', 
+                                    fontWeight: 'bold',
+                                    width: '60px'
+                                }}>
+                                    {player.score}
+                                </td>
+                            </tr>
+                        );
+                    })}
                 </tbody>
             </table>
         </div>

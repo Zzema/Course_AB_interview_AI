@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import UserSetup from './components/UserSetup';
 import ProgressSummary from './components/ProgressSummary';
 import GameScreen from './components/GameScreen';
-import StatisticsScreen from './components/StatisticsScreen';
+import StatisticsScreen from './components/StatisticsScreenGamified';
 import * as api from './lib/api';
 import { GameState, Session, User } from './types';
 
@@ -102,6 +102,50 @@ function App() {
                 if (!existingState.questionAttempts) {
                     console.log('🔄 Migrating: Creating questionAttempts');
                     existingState.questionAttempts = [];
+                }
+                
+                // Migrate: Sync rating with XP from questionAttempts
+                if (existingState.questionAttempts && existingState.questionAttempts.length > 0) {
+                    console.log('🔄 Migrating: Syncing rating with actual XP from questionAttempts');
+                    let calculatedRating = 0;
+                    existingState.questionAttempts.forEach(attempt => {
+                        calculatedRating += attempt.earnedXP ?? 0;
+                    });
+                    
+                    // Only update if there's a mismatch
+                    if (existingState.rating !== calculatedRating) {
+                        console.log(`🔄 Rating mismatch: ${existingState.rating} → ${calculatedRating}`);
+                        existingState.rating = calculatedRating;
+                        
+                        // Rebuild rating history from attempts
+                        const newRatingHistory = [0];
+                        let cumulative = 0;
+                        existingState.questionAttempts.forEach(attempt => {
+                            cumulative += attempt.earnedXP ?? 0;
+                            newRatingHistory.push(cumulative);
+                        });
+                        existingState.ratingHistory = newRatingHistory;
+                        console.log(`✅ Rating synced: ${calculatedRating} XP`);
+                    } else {
+                        console.log(`✅ Rating already in sync: ${calculatedRating} XP`);
+                    }
+                }
+                
+                // Migrate questionAttempts: add earnedXP if missing
+                if (existingState.questionAttempts && existingState.questionAttempts.length > 0) {
+                    const hasOldAttempts = existingState.questionAttempts.some(a => a.earnedXP === undefined);
+                    if (hasOldAttempts) {
+                        console.log('🔄 Migrating: Adding earnedXP to questionAttempts');
+                        const { calculateXP } = await import('./lib/xpCalculator');
+                        existingState.questionAttempts = existingState.questionAttempts.map(attempt => {
+                            if (attempt.earnedXP === undefined) {
+                                const xpResult = calculateXP(attempt.feedback.overallScore, attempt.difficulty);
+                                return { ...attempt, earnedXP: xpResult.earnedXP };
+                            }
+                            return attempt;
+                        });
+                        console.log('✅ Migration complete: earnedXP added');
+                    }
                 }
                 
                 setSession({ user, gameState: existingState });

@@ -7,38 +7,12 @@ import { KEY_POINT_TO_CATEGORY_MAP, CATEGORIES_CONFIG } from '../data/constants'
 interface FeedbackOverlayProps {
     feedback: Feedback;
     onNext: () => void;
-    oldRating: number;
+    oldXP: number;
     question: Question;
-    earnedPoints?: number;
+    earnedXP?: number;
 }
 
-const FeedbackOverlay: React.FC<FeedbackOverlayProps> = ({ feedback, onNext, oldRating, question, earnedPoints }) => {
-    
-    // Calculate rating breakdown for display
-    const ratingBreakdown = useMemo(() => {
-        const difficultyMultiplier = 1 + (question.difficulty - 5) * 0.1;
-        const adjustedPoints = feedback.overallScore * difficultyMultiplier;
-        
-        let qualityBonus = 0;
-        let qualityBonusText = '';
-        if (feedback.overallScore >= 8) {
-            qualityBonus = 5;
-            qualityBonusText = 'Отличный ответ (≥8)';
-        } else if (feedback.overallScore >= 6) {
-            qualityBonus = 2;
-            qualityBonusText = 'Хороший ответ (6-7)';
-        }
-        
-        return {
-            baseScore: feedback.overallScore,
-            difficulty: question.difficulty,
-            difficultyMultiplier: difficultyMultiplier.toFixed(2),
-            adjustedPoints: adjustedPoints.toFixed(1),
-            qualityBonus,
-            qualityBonusText,
-            totalEarned: earnedPoints ?? Math.round(adjustedPoints + qualityBonus)
-        };
-    }, [feedback.overallScore, question.difficulty, earnedPoints]);
+const FeedbackOverlay: React.FC<FeedbackOverlayProps> = ({ feedback, onNext, oldXP, question, earnedXP }) => {
     
     const filteredBreakdown = useMemo(() => {
         // If the question has no key points, we can't filter, so we show the breakdown as is from the API.
@@ -80,7 +54,7 @@ const FeedbackOverlay: React.FC<FeedbackOverlayProps> = ({ feedback, onNext, old
                     marginBottom: window.innerWidth <= 768 ? '1rem' : '1.5rem'
                 }}>{feedback.overallScore} / 10</div>
                 
-                {/* Детальная разбивка очков */}
+                {/* Детальная разбивка XP */}
                 <div style={{
                     backgroundColor: 'rgba(106, 90, 205, 0.1)',
                     borderRadius: '12px',
@@ -93,65 +67,104 @@ const FeedbackOverlay: React.FC<FeedbackOverlayProps> = ({ feedback, onNext, old
                         marginBottom: '0.75rem', 
                         textAlign: 'center'
                     }}>
-                        Ваш рейтинг: {oldRating} → <span style={{color: 'var(--primary-color)', fontWeight: 'bold'}}>{oldRating + ratingBreakdown.totalEarned}</span>
+                        ⭐ Ваш опыт: {oldXP} → <span style={{
+                            color: earnedXP && earnedXP >= 0 ? '#10b981' : '#ef4444', 
+                            fontWeight: 'bold'
+                        }}>
+                            {oldXP + (earnedXP ?? 0)} ({earnedXP && earnedXP >= 0 ? '+' : ''}{earnedXP ?? 0})
+                        </span>
                     </p>
                     <div style={{
                         fontSize: window.innerWidth <= 768 ? '0.8rem' : '0.9rem', 
                         color: 'var(--text-secondary)', 
                         lineHeight: '1.8'
                     }}>
-                        <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem'}}>
-                            <span>📝 Базовая оценка:</span>
-                            <span style={{fontWeight: 'bold'}}>{ratingBreakdown.baseScore}/10</span>
-                        </div>
-                        <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem'}}>
-                            <span>🎯 Сложность вопроса:</span>
-                            <span>{ratingBreakdown.difficulty}/10</span>
+                        <strong>📊 Расчет опыта:</strong><br/>
+                        <div style={{marginTop: '0.5rem'}}>
+                            {earnedXP !== undefined && earnedXP > 0 ? (
+                                // Положительный XP (оценка >= 4)
+                                <>
+                                    <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem'}}>
+                                        <span>📝 Качество ответа:</span>
+                                        <span style={{fontWeight: 'bold'}}>{feedback.overallScore}/10</span>
+                                    </div>
+                                    <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem'}}>
+                                        <span>🎯 Сложность ({question.seniority}):</span>
+                                        <span>{question.difficulty}/10</span>
+                                    </div>
+                                    <div style={{
+                                        fontSize: '0.75rem',
+                                        color: 'rgba(255, 255, 255, 0.6)',
+                                        fontStyle: 'italic',
+                                        marginTop: '0.25rem',
+                                        marginBottom: '0.5rem'
+                                    }}>
+                                        💡 Сложные вопросы дают больше XP за хорошие ответы
+                                    </div>
+                                    <div style={{
+                                        display: 'flex', 
+                                        justifyContent: 'space-between', 
+                                        marginTop: '0.75rem',
+                                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                                        padding: '0.5rem',
+                                        borderRadius: '6px'
+                                    }}>
+                                        <span>⚙️ Формула:</span>
+                                        <span style={{fontWeight: 'bold', color: '#10b981'}}>
+                                            ({feedback.overallScore}/10) × {question.difficulty} × 10 = +{earnedXP} ✅
+                                        </span>
+                                    </div>
+                                </>
+                            ) : (
+                                // Отрицательный XP (оценка < 4)
+                                <>
+                                    <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem'}}>
+                                        <span>📝 Качество ответа:</span>
+                                        <span style={{fontWeight: 'bold', color: '#ef4444'}}>{feedback.overallScore}/10 (нужно ≥4)</span>
+                                    </div>
+                                    <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem'}}>
+                                        <span>🎯 Сложность ({question.seniority}):</span>
+                                        <span>{question.difficulty}/10</span>
+                                    </div>
+                                    <div style={{
+                                        fontSize: '0.75rem',
+                                        color: 'rgba(255, 255, 255, 0.6)',
+                                        fontStyle: 'italic',
+                                        marginTop: '0.25rem',
+                                        marginBottom: '0.5rem'
+                                    }}>
+                                        ⚠️ Плохой ответ (&lt;4) - штраф к опыту!
+                                    </div>
+                                    <div style={{
+                                        display: 'flex', 
+                                        justifyContent: 'space-between', 
+                                        marginTop: '0.75rem',
+                                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                                        padding: '0.5rem',
+                                        borderRadius: '6px'
+                                    }}>
+                                        <span>⚙️ Штраф:</span>
+                                        <span style={{fontWeight: 'bold', color: '#ef4444'}}>
+                                            ((4-{feedback.overallScore})/4) × {question.difficulty} × (-5) = {earnedXP} ❌
+                                        </span>
+                                    </div>
+                                </>
+                            )}
                         </div>
                         <div style={{
-                            display: 'flex', 
-                            justifyContent: 'space-between', 
-                            marginBottom: '0.5rem',
-                            paddingLeft: '1rem',
-                            fontSize: '0.85rem',
-                            fontStyle: 'italic'
-                        }}>
-                            <span>↳ Множитель сложности:</span>
-                            <span>×{ratingBreakdown.difficultyMultiplier}</span>
-                        </div>
-                        <div style={{
-                            display: 'flex', 
-                            justifyContent: 'space-between', 
-                            marginBottom: '0.5rem',
-                            backgroundColor: 'rgba(106, 90, 205, 0.05)',
+                            marginTop: '0.75rem',
                             padding: '0.5rem',
-                            borderRadius: '6px'
+                            background: earnedXP !== undefined && earnedXP > 0 
+                                ? 'rgba(16, 185, 129, 0.1)' 
+                                : 'rgba(239, 68, 68, 0.1)',
+                            borderRadius: '6px',
+                            fontSize: window.innerWidth <= 768 ? '0.75rem' : '0.85rem',
+                            fontStyle: 'italic',
+                            color: 'rgba(255, 255, 255, 0.8)'
                         }}>
-                            <span>⚙️ После умножения:</span>
-                            <span style={{fontWeight: 'bold'}}>
-                                {ratingBreakdown.baseScore} × {ratingBreakdown.difficultyMultiplier} = {ratingBreakdown.adjustedPoints}
-                            </span>
-                        </div>
-                        {ratingBreakdown.qualityBonus > 0 && (
-                            <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem'}}>
-                                <span>⭐ Бонус за качество:</span>
-                                <span style={{color: 'var(--success-color)', fontWeight: 'bold'}}>
-                                    +{ratingBreakdown.qualityBonus} ({ratingBreakdown.qualityBonusText})
-                                </span>
-                            </div>
-                        )}
-                        <div style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            marginTop: '0.5rem',
-                            paddingTop: '0.5rem',
-                            borderTop: '2px solid var(--border-color)',
-                            fontWeight: 'bold',
-                            color: 'var(--primary-color)',
-                            fontSize: '1rem'
-                        }}>
-                            <span>🏆 Итого заработано:</span>
-                            <span>+{ratingBreakdown.totalEarned} очков</span>
+                            💡 {earnedXP !== undefined && earnedXP > 0
+                                ? 'Отвечайте на сложные вопросы с высокой оценкой для максимального опыта!' 
+                                : 'Оценка <4 отнимает опыт. Стремитесь к 4+ баллам!'}
                         </div>
                     </div>
                 </div>

@@ -12,24 +12,23 @@ export interface QuestionAttempt {
     timestamp: number; // Время ответа (Unix timestamp)
     answer: string; // Ответ пользователя
     feedback: Feedback; // Полная обратная связь от AI
-    earnedPoints: number; // Заработанные баллы
+    earnedXP: number; // Заработанный опыт
     difficulty: DifficultyLevel; // Сложность вопроса (на момент ответа)
     seniority: SeniorityLevel; // Уровень вопроса
 }
 
 export interface GameState {
     currentQuestionIndex: number;
-    rating: number;
+    rating: number; // Опыт игрока (может быть положительным и отрицательным)
     categoryScores: Record<string, { totalScore: number; count: number }>;
     keyPointScores: Record<string, { totalScore: number; count: number }>;
     consecutiveGoodAnswersOnSimpleQuestions: number;
-    ratingHistory?: number[]; // История накопленного рейтинга после каждого вопроса
-    initialLevel?: 'junior' | 'mid' | 'senior' | 'staff'; // 🆕 Начальный уровень аналитика (фиксированный)
+    ratingHistory?: number[]; // История накопленного опыта после каждого вопроса
+    initialLevel?: 'junior' | 'mid' | 'senior' | 'staff'; // Начальный уровень аналитика (целевая позиция)
     selectedDifficulty?: 'all' | 'junior' | 'mid' | 'senior' | 'staff'; // Выбранный уровень сложности вопросов
-    askedQuestionIds?: number[]; // ID уже заданных вопросов для рандомизации (для обратной совместимости)
     currentQuestionId?: number; // ID текущего отображаемого вопроса
     levelProgress?: Record<'junior' | 'mid' | 'senior' | 'staff', LevelProgress>; // Прогресс по каждому уровню
-    questionAttempts?: QuestionAttempt[]; // 🆕 История всех попыток ответов на вопросы
+    questionAttempts?: QuestionAttempt[]; // История всех попыток ответов на вопросы
 }
 
 export interface User {

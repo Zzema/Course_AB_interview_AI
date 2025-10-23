@@ -117,11 +117,10 @@ export const createInitialGameState = (): GameState => {
             return acc;
         }, {} as Record<string, { totalScore: number; count: number }>),
         consecutiveGoodAnswersOnSimpleQuestions: 0,
-        ratingHistory: [0], // Начинаем с 0 рейтинга
-        initialLevel: 'junior', // 🆕 Начальный уровень аналитика (будет установлен при первом входе)
-        selectedDifficulty: 'junior', // Начинаем с junior
-        askedQuestionIds: [], // Пустой список заданных вопросов (для обратной совместимости)
-        levelProgress, // Детальный прогресс по каждому уровню
-        questionAttempts: [], // 🆕 История ответов на вопросы
+        ratingHistory: [0],
+        initialLevel: 'junior',
+        selectedDifficulty: 'junior',
+        levelProgress,
+        questionAttempts: []
     };
 };
