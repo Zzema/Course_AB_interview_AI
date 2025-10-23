@@ -46,6 +46,7 @@ interface LeaderboardEntry {
     isCurrentUser?: boolean;
     ratingHistory?: number[];
     difficulty?: 'junior' | 'mid' | 'senior' | 'staff';
+    email?: string;
 }
 
 const Leaderboard: React.FC<LeaderboardProps> = ({ 
@@ -62,7 +63,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({
         }
 
         // Версия структуры лидерборда (увеличиваем при изменении LEADERBOARD_DATA)
-        const LEADERBOARD_VERSION = 5; // Увеличили версию для полного имени (Фамилия Имя)
+        const LEADERBOARD_VERSION = 6; // Увеличили версию для добавления email
         const storageKey = leaderboardType === 'recent' ? 'leaderboard-scores-recent' : 'leaderboard-scores';
         const versionKey = `${storageKey}-version`;
         const savedVersion = localStorage.getItem(versionKey);
@@ -93,7 +94,8 @@ const Leaderboard: React.FC<LeaderboardProps> = ({
             score: currentRating,
             isCurrentUser: true,
             ratingHistory: currentRatingHistory,
-            difficulty: selectedDifficulty === 'all' ? 'mid' : selectedDifficulty
+            difficulty: selectedDifficulty === 'all' ? 'mid' : selectedDifficulty,
+            email: currentUser.email
         };
 
         if (existingUserIndex !== -1) {
@@ -155,10 +157,14 @@ const Leaderboard: React.FC<LeaderboardProps> = ({
                                     backgroundColor: player.isCurrentUser ? 'rgba(106, 90, 205, 0.1)' : 'transparent'
                                 }}
                             >
-                                <td style={{ 
-                                    padding: '0.75rem 0.5rem',
-                                    fontWeight: player.isCurrentUser ? 'bold' : 'normal'
-                                }}>
+                                <td 
+                                    style={{ 
+                                        padding: '0.75rem 0.5rem',
+                                        fontWeight: player.isCurrentUser ? 'bold' : 'normal',
+                                        cursor: player.email ? 'help' : 'default'
+                                    }}
+                                    title={player.email || undefined}
+                                >
                                     {index + 1}. {player.name} {player.isCurrentUser && '👤'}
                                 </td>
                                 {selectedDifficulty === 'all' && (
