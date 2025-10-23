@@ -6,9 +6,7 @@ import { GEMINI_PROXY_URL } from '../config/config';
 import { styles } from '../styles';
 import { createInitialGameState } from '../lib/api';
 import ProgressBar from './ProgressBar';
-import Leaderboard from './Leaderboard';
 import FeedbackOverlay from './FeedbackOverlay';
-import RatingProgressChart from './RatingProgressChart';
 
 interface GameScreenProps {
     user: User;
@@ -39,7 +37,6 @@ const GameScreen: React.FC<GameScreenProps> = ({ user, onLogout, gameState, setG
     const [lastEarnedPoints, setLastEarnedPoints] = useState<number>(0);
     const [levelUpNotification, setLevelUpNotification] = useState<string | null>(null);
     const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
-    const [showAllCategories, setShowAllCategories] = useState(false);
 
     // Получаем текущий вопрос с учетом уровня и рандомизации
     const currentQuestion = useMemo(() => {
@@ -135,15 +132,6 @@ const GameScreen: React.FC<GameScreenProps> = ({ user, onLogout, gameState, setG
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
     }, []);
-
-    const categoryAverages = useMemo(() => {
-        const scores = gameState.categoryScores;
-        return Object.keys(scores).reduce((acc, key) => {
-            const value = scores[key];
-            acc[key] = value.count > 0 ? (value.totalScore / value.count) * 10 : 0;
-            return acc;
-        }, {} as Record<string, number>);
-    }, [gameState.categoryScores]);
 
     // Обработчик изменения текста с ограничением по длине
     const handleAnswerChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -636,14 +624,26 @@ const GameScreen: React.FC<GameScreenProps> = ({ user, onLogout, gameState, setG
                 </div>
             </header>
 
-            <main style={styles.mainContent}>
-                <div style={styles.gameScreen} className="fade-in">
-                    <div style={styles.questionCard}>
+            <main style={{
+                ...styles.mainContent,
+                padding: isMobile ? '0.75rem' : '1.5rem',
+                gap: isMobile ? '0.75rem' : '1.5rem'
+            }}>
+                <div style={{
+                    ...styles.gameScreen,
+                    gap: isMobile ? '0.75rem' : '1.5rem'
+                }} className="fade-in">
+                    <div style={{
+                        ...styles.questionCard,
+                        padding: isMobile ? '0.75rem' : '1.5rem'
+                    }}>
                         <div style={{
                             ...styles.questionMeta,
                             flexDirection: isMobile ? 'column' : 'row',
                             alignItems: isMobile ? 'stretch' : 'center',
-                            gap: isMobile ? '0.5rem' : '0'
+                            gap: isMobile ? '0.5rem' : '0',
+                            fontSize: isMobile ? '0.7rem' : '0.9rem',
+                            marginBottom: isMobile ? '0.5rem' : '1rem'
                         }}>
                             <span>Сложность: {currentQuestion.difficulty}/10</span>
                             <div style={{
@@ -660,6 +660,9 @@ const GameScreen: React.FC<GameScreenProps> = ({ user, onLogout, gameState, setG
                         <p 
                             style={{
                                 ...styles.questionText,
+                                fontSize: isMobile ? '1rem' : '1.2rem',
+                                lineHeight: isMobile ? '1.4' : '1.6',
+                                marginBottom: isMobile ? '0.75rem' : '1.5rem',
                                 userSelect: 'none',
                                 WebkitUserSelect: 'none',
                                 MozUserSelect: 'none',
@@ -675,8 +678,13 @@ const GameScreen: React.FC<GameScreenProps> = ({ user, onLogout, gameState, setG
                             value={answer}
                                 onChange={handleAnswerChange}
                                 onPaste={handlePaste}
-                                placeholder="Введите ваш развернутый ответ... (минимум 100 символов)"
-                            style={styles.textarea}
+                            placeholder="Введите ваш развернутый ответ... (минимум 100 символов)"
+                            style={{
+                                ...styles.textarea,
+                                minHeight: isMobile ? '120px' : '150px',
+                                fontSize: isMobile ? '0.9rem' : '1rem',
+                                padding: isMobile ? '0.75rem' : '1rem'
+                            }}
                             disabled={isLoading}
                         />
                             <div style={{
@@ -704,7 +712,9 @@ const GameScreen: React.FC<GameScreenProps> = ({ user, onLogout, gameState, setG
                         <button 
                             onClick={evaluateAnswer} 
                             style={{ 
-                                ...styles.submitButton, 
+                                ...styles.submitButton,
+                                padding: isMobile ? '0.75rem' : '1rem',
+                                fontSize: isMobile ? '0.95rem' : '1rem',
                                 opacity: isLoading || answer.length < MIN_ANSWER_LENGTH ? 0.5 : 1 
                             }} 
                             disabled={isLoading || answer.length < MIN_ANSWER_LENGTH}
@@ -713,76 +723,8 @@ const GameScreen: React.FC<GameScreenProps> = ({ user, onLogout, gameState, setG
                             {isLoading ? 'Оцениваем...' : 'Ответить'}
                         </button>
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                        {gameState.ratingHistory && gameState.ratingHistory.length > 1 && (
-                            <RatingProgressChart 
-                                ratingHistory={gameState.ratingHistory} 
-                                currentUserName={user.given_name || user.name}
-                            />
-                        )}
-                        <Leaderboard 
-                            currentUser={user} 
-                            currentRating={gameState.rating}
-                            currentRatingHistory={gameState.ratingHistory}
-                        />
-                    </div>
                 </div>
             </main>
-
-            <footer style={{
-                ...styles.statsFooter,
-                padding: isMobile ? '0.75rem 1rem' : '1rem 1.5rem',
-            }}>
-                {isMobile ? (
-                    // Мобильная версия: показываем топ-3 или все
-                    <>
-                        {Object.entries(CATEGORIES_CONFIG)
-                            .sort((a, b) => (categoryAverages[b[0]] || 0) - (categoryAverages[a[0]] || 0))
-                            .slice(0, showAllCategories ? undefined : 3)
-                            .map(([key, { name, color, description }]) => (
-                                <div key={key} style={styles.categoryStat} title={description}>
-                                    <div style={{ 
-                                        fontSize: '0.75rem', 
-                                        color: 'var(--text-secondary)', 
-                                        marginBottom: '0.4rem', 
-                                        whiteSpace: 'nowrap', 
-                                        overflow: 'hidden', 
-                                        textOverflow: 'ellipsis' 
-                                    }}>
-                                        {name}
-                                    </div>
-                                    <ProgressBar value={categoryAverages[key]} color={color} />
-                                </div>
-                            ))
-                        }
-                        <button
-                            onClick={() => setShowAllCategories(!showAllCategories)}
-                            style={{
-                                gridColumn: '1 / -1',
-                                padding: '0.5rem',
-                                background: 'transparent',
-                                border: '1px dashed var(--border-color)',
-                                borderRadius: '8px',
-                                color: 'var(--primary-color)',
-                                fontSize: '0.75rem',
-                                cursor: 'pointer',
-                                marginTop: '0.5rem',
-                                transition: 'all 0.2s ease'
-                            }}
-                        >
-                            {showAllCategories ? '▲ Свернуть' : `▼ Показать все (${Object.keys(CATEGORIES_CONFIG).length})`}
-                        </button>
-                    </>
-                ) : (
-                    // Десктопная версия: показываем все
-                    Object.entries(CATEGORIES_CONFIG).map(([key, { name, color, description }]) => (
-                        <div key={key} style={styles.categoryStat} title={description}>
-                        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</div>
-                        <ProgressBar value={categoryAverages[key]} color={color} />
-                    </div>
-                    ))
-                )}
-            </footer>
 
             {feedback && <FeedbackOverlay 
                 feedback={feedback} 

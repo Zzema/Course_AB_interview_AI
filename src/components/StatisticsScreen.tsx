@@ -3,6 +3,8 @@ import { GameState, User, KeyPoint } from '../types';
 import { CATEGORIES_CONFIG, KEY_POINT_CONFIG, QUESTION_DATABASE } from '../data/constants';
 import { styles } from '../styles';
 import ProgressBar from './ProgressBar';
+import Leaderboard from './Leaderboard';
+import RatingProgressChart from './RatingProgressChart';
 
 
 interface StatisticsScreenProps {
@@ -37,6 +39,7 @@ const KeyPointStats: React.FC<{ title: string; data: { name: string; score: numb
 
 const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ user, gameState, onBack }) => {
     const [isMobile, setIsMobile] = useState(window.innerWidth <= 600);
+    const [activeTab, setActiveTab] = useState<'stats' | 'leaderboard'>('stats');
 
     useEffect(() => {
         const handleResize = () => setIsMobile(window.innerWidth <= 600);
@@ -146,7 +149,64 @@ const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ user, gameState, on
                     ↩ Назад
                 </button>
             </header>
+            
+            {/* Вкладки */}
+            <div style={{
+                display: 'flex',
+                gap: '1rem',
+                padding: '0 1.5rem',
+                marginBottom: '1rem',
+                borderBottom: '2px solid var(--border-color)'
+            }}>
+                <button
+                    onClick={() => setActiveTab('stats')}
+                    style={{
+                        padding: '0.75rem 1.5rem',
+                        background: 'none',
+                        border: 'none',
+                        borderBottom: activeTab === 'stats' ? '3px solid var(--primary-color)' : '3px solid transparent',
+                        color: activeTab === 'stats' ? 'var(--primary-color)' : 'var(--text-secondary)',
+                        fontWeight: activeTab === 'stats' ? '600' : '400',
+                        fontSize: '1rem',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        marginBottom: '-2px'
+                    }}
+                >
+                    📊 Моя статистика
+                </button>
+                <button
+                    onClick={() => setActiveTab('leaderboard')}
+                    style={{
+                        padding: '0.75rem 1.5rem',
+                        background: 'none',
+                        border: 'none',
+                        borderBottom: activeTab === 'leaderboard' ? '3px solid var(--primary-color)' : '3px solid transparent',
+                        color: activeTab === 'leaderboard' ? 'var(--primary-color)' : 'var(--text-secondary)',
+                        fontWeight: activeTab === 'leaderboard' ? '600' : '400',
+                        fontSize: '1rem',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        marginBottom: '-2px'
+                    }}
+                >
+                    🏆 Лидерборд
+                </button>
+            </div>
+            
             <main style={mainContentStyle}>
+                {activeTab === 'stats' ? (
+                    <>
+                {/* График прогресса рейтинга */}
+                {gameState.ratingHistory && gameState.ratingHistory.length > 1 && (
+                    <div style={{ marginBottom: '1.5rem' }}>
+                        <RatingProgressChart 
+                            ratingHistory={gameState.ratingHistory} 
+                            currentUserName={user.given_name || user.name}
+                        />
+                    </div>
+                )}
+                
                 <div style={summaryGridStyle}>
                     <div style={styles.statsSummaryCard}>
                         <div style={{...summaryCardValueStyle, color: 'var(--primary-color)'}}>{gameState.rating}</div>
@@ -222,6 +282,15 @@ const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ user, gameState, on
                         </div>
                     )}
                 </div>
+                    </>
+                ) : (
+                    /* Вкладка "Лидерборд" */
+                    <Leaderboard 
+                        currentUser={user} 
+                        currentRating={gameState.rating}
+                        currentRatingHistory={gameState.ratingHistory}
+                    />
+                )}
             </main>
         </div>
     );
