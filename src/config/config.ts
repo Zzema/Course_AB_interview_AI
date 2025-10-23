@@ -23,4 +23,4 @@ export const GEMINI_API_KEY = ""; // Больше не используется 
 // https://your-app-name.up.railway.app/api/generate
 // ============================================================================
 
-export const GEMINI_PROXY_URL = ""; // Заполните после деплоя на Railway
+export const GEMINI_PROXY_URL = "https://courseabinterviewai-production.up.railway.app/api/generate";
