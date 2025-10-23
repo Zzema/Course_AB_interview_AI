@@ -47,6 +47,8 @@ interface LeaderboardEntry {
     ratingHistory?: number[];
     difficulty?: 'junior' | 'mid' | 'senior' | 'staff';
     email?: string;
+    isSeparator?: boolean;
+    position?: number;
 }
 
 const Leaderboard: React.FC<LeaderboardProps> = ({ 
@@ -110,12 +112,44 @@ const Leaderboard: React.FC<LeaderboardProps> = ({
         const filteredScores = allScores
             .filter(entry => selectedDifficulty === 'all' || entry.difficulty === selectedDifficulty)
             .sort((a, b) => b.score - a.score)
-            .slice(0, 10);
+            .map((entry, index) => ({ ...entry, position: index + 1 })); // Добавляем реальную позицию
 
         // Сохраняем обновленный лидерборд (всех пользователей, не только отфильтрованных)
         localStorage.setItem(storageKey, JSON.stringify(allScores));
 
-        return filteredScores;
+        // Умная логика отображения:
+        // 1. Топ-5
+        // 2. ... (разделитель, если нужен)
+        // 3. 1 человек перед текущим пользователем
+        // 4. Текущий пользователь
+        // 5. 1 человек после текущего пользователя
+        
+        const currentUserIndex = filteredScores.findIndex(entry => entry.isCurrentUser);
+        
+        if (filteredScores.length <= 7 || currentUserIndex < 5) {
+            // Если мало людей или пользователь в топ-5, показываем всех (макс 10)
+            return filteredScores.slice(0, 10);
+        }
+        
+        // Показываем топ-5
+        const top5 = filteredScores.slice(0, 5);
+        
+        // Показываем окружение пользователя (1 перед, сам, 1 после)
+        const userContext = filteredScores.slice(
+            Math.max(5, currentUserIndex - 1), 
+            Math.min(filteredScores.length, currentUserIndex + 2)
+        );
+        
+        // Добавляем маркер разделителя
+        const separator = {
+            name: '...',
+            score: 0,
+            isCurrentUser: false,
+            isSeparator: true,
+            position: 0
+        };
+        
+        return [...top5, separator, ...userContext];
     }, [currentUser, currentRating, currentRatingHistory, selectedDifficulty, leaderboardType]);
 
     const difficultyLabel = {
@@ -141,7 +175,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({
             </div>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <tbody>
-                    {leaderboardData.map((player, index) => {
+                    {leaderboardData.map((player, displayIndex) => {
                         const levelIcons = {
                             junior: '🌱',
                             mid: '⭐',
@@ -149,11 +183,37 @@ const Leaderboard: React.FC<LeaderboardProps> = ({
                             staff: '👑'
                         };
                         
+                        // Для разделителя
+                        if (player.isSeparator) {
+                            return (
+                                <tr 
+                                    key={`separator-${displayIndex}`}
+                                    style={{ 
+                                        borderBottom: '1px solid var(--border-color)',
+                                        backgroundColor: 'transparent'
+                                    }}
+                                >
+                                    <td 
+                                        colSpan={selectedDifficulty === 'all' ? 4 : 3}
+                                        style={{ 
+                                            padding: '0.5rem',
+                                            textAlign: 'center',
+                                            color: 'var(--text-secondary)',
+                                            fontSize: '1.5rem',
+                                            letterSpacing: '0.3em'
+                                        }}
+                                    >
+                                        ···
+                                    </td>
+                                </tr>
+                            );
+                        }
+                        
                         return (
                             <tr 
-                                key={`${player.name}-${index}`} 
+                                key={`${player.name}-${displayIndex}`} 
                                 style={{ 
-                                    borderBottom: index < leaderboardData.length - 1 ? '1px solid var(--border-color)' : 'none',
+                                    borderBottom: displayIndex < leaderboardData.length - 1 ? '1px solid var(--border-color)' : 'none',
                                     backgroundColor: player.isCurrentUser ? 'rgba(106, 90, 205, 0.1)' : 'transparent'
                                 }}
                             >
@@ -165,7 +225,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({
                                     }}
                                     title={player.email || undefined}
                                 >
-                                    {index + 1}. {player.name} {player.isCurrentUser && '👤'}
+                                    {player.position}. {player.name} {player.isCurrentUser && '👤'}
                                 </td>
                                 {selectedDifficulty === 'all' && (
                                     <td style={{
