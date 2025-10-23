@@ -16,17 +16,17 @@ interface LevelInfo {
  * Расчет XP для среднестатистического прохождения:
  * - Средняя сложность: 5
  * - Средняя оценка: 7
- * - XP за вопрос: 10 * 5 * 0.7 = 35 XP
+ * - XP за вопрос: 5 * 5 * 0.7 ≈ 18 XP
  * 
- * Новичок → Практик: 500 XP ≈ 14 вопросов
- * Практик → Мастер: 1500 XP ≈ 43 вопроса (всего ~57 вопросов)
- * Мастер → Эксперт: 3500 XP ≈ 100 вопросов (всего ~157 вопросов)
+ * Новичок → Практик: 250 XP ≈ 14 вопросов
+ * Практик → Мастер: 750 XP ≈ 42 вопроса (всего ~56 вопросов)
+ * Мастер → Эксперт: 1750 XP ≈ 97 вопросов (всего ~153 вопроса)
  */
 const LEVELS: LevelInfo[] = [
-    { name: 'junior', displayName: 'НОВИЧОК', min: 0, max: 500 },
-    { name: 'mid', displayName: 'ПРАКТИК', min: 500, max: 1500 },
-    { name: 'senior', displayName: 'МАСТЕР', min: 1500, max: 3500 },
-    { name: 'staff', displayName: 'ЭКСПЕРТ', min: 3500, max: Infinity }
+    { name: 'junior', displayName: 'НОВИЧОК', min: 0, max: 250 },
+    { name: 'mid', displayName: 'ПРАКТИК', min: 250, max: 750 },
+    { name: 'senior', displayName: 'МАСТЕР', min: 750, max: 1750 },
+    { name: 'staff', displayName: 'ЭКСПЕРТ', min: 1750, max: Infinity }
 ];
 
 export interface LevelData {

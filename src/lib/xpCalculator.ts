@@ -5,22 +5,22 @@
  * Формула для плохих ответов (score < 4): XP = -PENALTY_XP * difficulty * ((4 - score) / 4)
  * 
  * Примеры положительного XP:
- * - difficulty=1, score=10 → 10 * 1 * 1.0 = 10 XP
- * - difficulty=5, score=8 → 10 * 5 * 0.8 = 40 XP
- * - difficulty=10, score=10 → 10 * 10 * 1.0 = 100 XP
- * - difficulty=5, score=6 → 10 * 5 * 0.6 = 30 XP
- * - difficulty=5, score=5 → 10 * 5 * 0.5 = 25 XP
- * - difficulty=5, score=4 → 10 * 5 * 0.4 = 20 XP (минимальный порог для роста)
+ * - difficulty=1, score=10 → 5 * 1 * 1.0 = 5 XP
+ * - difficulty=5, score=8 → 5 * 5 * 0.8 = 20 XP
+ * - difficulty=10, score=10 → 5 * 10 * 1.0 = 50 XP
+ * - difficulty=5, score=6 → 5 * 5 * 0.6 = 15 XP
+ * - difficulty=5, score=5 → 5 * 5 * 0.5 = 13 XP (округление)
+ * - difficulty=5, score=4 → 5 * 5 * 0.4 = 10 XP (минимальный порог для роста)
  * 
  * Примеры отрицательного XP:
- * - difficulty=5, score=3 → -5 * 5 * (1/4) = -6 XP
- * - difficulty=5, score=2 → -5 * 5 * (2/4) = -13 XP
- * - difficulty=5, score=0 → -5 * 5 * (4/4) = -25 XP
- * - difficulty=10, score=1 → -5 * 10 * (3/4) = -38 XP
+ * - difficulty=5, score=3 → -3 * 5 * (1/4) = -4 XP
+ * - difficulty=5, score=2 → -3 * 5 * (2/4) = -8 XP
+ * - difficulty=5, score=0 → -3 * 5 * (4/4) = -15 XP
+ * - difficulty=10, score=1 → -3 * 10 * (3/4) = -23 XP (округление)
  */
 
-const BASE_XP = 10; // Базовый XP за вопрос
-const PENALTY_XP = 5; // Штраф за плохой ответ (меньше чем награда)
+const BASE_XP = 5; // Базовый XP за вопрос (снижено для замедления прогрессии)
+const PENALTY_XP = 3; // Штраф за плохой ответ (меньше чем награда)
 const SCORE_THRESHOLD = 4; // Порог между наградой и штрафом (4+ дает XP)
 
 export interface XPCalculationResult {
