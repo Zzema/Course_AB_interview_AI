@@ -5,7 +5,6 @@ import { QUESTION_DATABASE, CATEGORIES_CONFIG, KEY_POINT_TO_CATEGORY_MAP } from 
 import { GEMINI_PROXY_URL } from '../config/config';
 import { styles } from '../styles';
 import { createInitialGameState } from '../lib/api';
-import ProgressBar from './ProgressBar';
 import FeedbackOverlay from './FeedbackOverlay';
 import { calculateXP } from '../lib/xpCalculator';
 
