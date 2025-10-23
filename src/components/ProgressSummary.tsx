@@ -98,30 +98,33 @@ const ProgressSummary: React.FC<ProgressSummaryProps> = ({ user, gameState, onCo
                     }}>
                         📈 Динамика опыта
                     </div>
-                    <svg 
-                        width="100%" 
-                        height={isMobile ? "150" : "200"}
-                        style={{ overflow: 'visible' }}
-                    >
-                        {(() => {
-                            // Build rating history from question attempts
-                            const attempts = gameState.questionAttempts || [];
-                            const history = [0]; // Start with 0
-                            let cumulativeRating = 0;
-                            
-                            attempts.forEach(attempt => {
-                                cumulativeRating += attempt.earnedXP || 0;
-                                history.push(cumulativeRating);
-                            });
-                            
-                            if (history.length < 2) return null;
+                    <div style={{ width: '100%', overflow: 'hidden' }}>
+                        <svg 
+                            viewBox={`0 0 ${isMobile ? 300 : 600} ${isMobile ? 150 : 200}`}
+                            width="100%"
+                            height="auto"
+                            preserveAspectRatio="xMidYMid meet"
+                            style={{ display: 'block' }}
+                        >
+                            {(() => {
+                                // Build rating history from question attempts
+                                const attempts = gameState.questionAttempts || [];
+                                const history = [0]; // Start with 0
+                                let cumulativeRating = 0;
+                                
+                                attempts.forEach(attempt => {
+                                    cumulativeRating += attempt.earnedXP || 0;
+                                    history.push(cumulativeRating);
+                                });
+                                
+                                if (history.length < 2) return null;
 
-                            const maxXP = Math.max(...history, 100);
-                            const minXP = Math.min(...history, -50);
-                            const range = maxXP - minXP || 1;
-                            const width = isMobile ? 300 : 600;
-                            const height = isMobile ? 150 : 200;
-                            const padding = 40;
+                                const maxXP = Math.max(...history, 100);
+                                const minXP = Math.min(...history, -50);
+                                const range = maxXP - minXP || 1;
+                                const width = isMobile ? 300 : 600;
+                                const height = isMobile ? 150 : 200;
+                                const padding = 40;
                             
                             const points = history.map((xp, index) => {
                                 const x = padding + (index / (history.length - 1 || 1)) * (width - padding * 2);
@@ -218,7 +221,8 @@ const ProgressSummary: React.FC<ProgressSummaryProps> = ({ user, gameState, onCo
                                 </>
                             );
                         })()}
-                    </svg>
+                        </svg>
+                    </div>
                     <div style={{
                         display: 'flex',
                         justifyContent: 'space-between',

@@ -683,28 +683,31 @@ const StatisticsScreenGamified: React.FC<StatisticsScreenGamifiedProps> = ({ use
                                 padding: isMobile ? '1.5rem' : '2rem',
                                 border: '1px solid rgba(255, 255, 255, 0.1)'
                             }}>
-                                <svg 
-                                    width="100%" 
-                                    height={isMobile ? "200" : "300"}
-                                    style={{ overflow: 'visible' }}
-                                >
-                                    {(() => {
-                                        // Build rating history from question attempts
-                                        const attempts = gameState.questionAttempts || [];
-                                        const history = [0]; // Start with 0
-                                        let cumulativeRating = 0;
-                                        
-                                        attempts.forEach(attempt => {
-                                            cumulativeRating += attempt.earnedXP || 0;
-                                            history.push(cumulativeRating);
-                                        });
-                                        
-                                        const maxRating = Math.max(...history, 100);
-                                        const minRating = Math.min(...history, 0);
-                                        const range = maxRating - minRating || 1;
-                                        const width = isMobile ? 300 : 600;
-                                        const height = isMobile ? 200 : 300;
-                                        const padding = 40;
+                                <div style={{ width: '100%', overflow: 'hidden' }}>
+                                    <svg 
+                                        viewBox={`0 0 ${isMobile ? 300 : 600} ${isMobile ? 200 : 300}`}
+                                        width="100%"
+                                        height="auto"
+                                        preserveAspectRatio="xMidYMid meet"
+                                        style={{ display: 'block' }}
+                                    >
+                                        {(() => {
+                                            // Build rating history from question attempts
+                                            const attempts = gameState.questionAttempts || [];
+                                            const history = [0]; // Start with 0
+                                            let cumulativeRating = 0;
+                                            
+                                            attempts.forEach(attempt => {
+                                                cumulativeRating += attempt.earnedXP || 0;
+                                                history.push(cumulativeRating);
+                                            });
+                                            
+                                            const maxRating = Math.max(...history, 100);
+                                            const minRating = Math.min(...history, 0);
+                                            const range = maxRating - minRating || 1;
+                                            const width = isMobile ? 300 : 600;
+                                            const height = isMobile ? 200 : 300;
+                                            const padding = 40;
                                         
                                         const points = history.map((rating, index) => {
                                             const x = padding + (index / (history.length - 1 || 1)) * (width - padding * 2);
@@ -802,7 +805,8 @@ const StatisticsScreenGamified: React.FC<StatisticsScreenGamifiedProps> = ({ use
                                             </>
                                         );
                                     })()}
-                                </svg>
+                                    </svg>
+                                </div>
                                 <div style={{
                                     textAlign: 'center',
                                     marginTop: '1rem',
