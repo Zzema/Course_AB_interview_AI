@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { GameState, User } from '../types';
-import { CATEGORIES_CONFIG } from '../constants';
+import { CATEGORIES_CONFIG } from '../data/constants';
 import { styles } from '../styles';
 import ProgressBar from './ProgressBar';
 

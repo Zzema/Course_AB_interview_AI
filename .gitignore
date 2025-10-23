@@ -1,16 +1,24 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Production
+dist/
+build/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
 # Logs
-logs
-*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-pnpm-debug.log*
 lerna-debug.log*
-
-node_modules
-dist
-dist-ssr
-*.local
 
 # Editor directories and files
 .vscode/*
@@ -22,3 +30,17 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Firebase
+.firebase/
+firebase-debug.log
+ui-debug.log
+
+# Cloudflare Worker (не добавляйте в git, если там секреты)
+# cloudflare-worker.js содержит только код, без секретов - можно коммитить
+
+# Misc
+*.log
+.cache
+coverage
+.turbo

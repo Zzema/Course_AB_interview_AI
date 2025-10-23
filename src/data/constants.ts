@@ -4,45 +4,89 @@ import { Question, Category, DifficultyLevel, SeniorityLevel, BigTechCompany, Ke
 // КОНФИГУРАЦИЯ КАТЕГОРИЙ
 // ============================================================================
 
-export const CATEGORIES_CONFIG: Record<Category, { name: string; color: string }> = {
-  foundations: { name: 'Основы', color: '#2979ff' },
-  statistics: { name: 'Статистика', color: '#00e676' },
-  design: { name: 'Дизайн эксперимента', color: '#ffc400' },
-  metrics: { name: 'Метрики', color: '#ff3d00' },
-  analysis: { name: 'Анализ', color: '#651fff' },
-  interpretation: { name: 'Интерпретация', color: '#d500f9' },
-  pitfalls: { name: 'Подводные камни', color: '#ff1744' },
-  cases: { name: 'Продуктовые кейсы', color: '#00e5ff' },
-  advanced_methods: { name: 'Продвинутые методы', color: '#76ff03' },
-  infrastructure: { name: 'Инфраструктура', color: '#64ffda' },
-  leadership: { name: 'Лидерство и культура', color: '#f50057' },
+export const CATEGORIES_CONFIG: Record<Category, { name: string; color: string; description: string }> = {
+  foundations: { 
+    name: 'Основы', 
+    color: '#2979ff',
+    description: 'Фундаментальные концепции A/B тестирования: гипотезы, p-value, доверительные интервалы, ошибки I и II рода'
+  },
+  statistics: { 
+    name: 'Статистика', 
+    color: '#00e676',
+    description: 'Статистические методы: t-тесты, бутстреп, байесовский подход, распределения, мощность теста'
+  },
+  design: { 
+    name: 'Дизайн эксперимента', 
+    color: '#ffc400',
+    description: 'Планирование экспериментов: размер выборки, рандомизация, A/A тесты, стратификация, длительность'
+  },
+  metrics: { 
+    name: 'Метрики', 
+    color: '#ff3d00',
+    description: 'Выбор и проектирование метрик: первичные/вторичные метрики, соотношения, композитные метрики'
+  },
+  analysis: { 
+    name: 'Анализ', 
+    color: '#651fff',
+    description: 'Анализ результатов: сегментация, гетерогенные эффекты, outliers, множественные сравнения'
+  },
+  interpretation: { 
+    name: 'Интерпретация', 
+    color: '#d500f9',
+    description: 'Интерпретация данных: практическая значимость, причинность, внешняя валидность, бизнес-выводы'
+  },
+  pitfalls: { 
+    name: 'Подводные камни', 
+    color: '#ff1744',
+    description: 'Типичные ошибки: peeking, multiple testing, SRM, spillover эффекты, Simpson\'s paradox'
+  },
+  cases: { 
+    name: 'Продуктовые кейсы', 
+    color: '#00e5ff',
+    description: 'Реальные кейсы: запуск фичей, оптимизация воронок, изменение дизайна, pricing эксперименты'
+  },
+  advanced_methods: { 
+    name: 'Продвинутые методы', 
+    color: '#76ff03',
+    description: 'Сложные техники: CUPED, difference-in-differences, quasi-experiments, bandits, switchback'
+  },
+  infrastructure: { 
+    name: 'Инфраструктура', 
+    color: '#64ffda',
+    description: 'Платформы экспериментов: feature flagging, logging, мониторинг, автоматизация, масштабирование'
+  },
+  leadership: { 
+    name: 'Лидерство и культура', 
+    color: '#f50057',
+    description: 'Организационные аспекты: внедрение культуры экспериментов, обучение команды, governance'
+  },
 };
 
 // ============================================================================
 // КОНФИГУРАЦИЯ КЛЮЧЕВЫХ ПОИНТОВ
 // ============================================================================
-export const KEY_POINT_CONFIG: Record<KeyPoint, { name: string }> = {
-  'type-i-error': { name: 'Ошибка I рода' },
-  'type-ii-error': { name: 'Ошибка II рода' },
-  'statistical-power': { name: 'Стат. мощность' },
-  'statistical-significance': { name: 'Стат. значимость' },
-  'multiple-testing': { name: 'Множ. тестирование' },
-  'sample-size': { name: 'Размер выборки' },
-  'randomization': { name: 'Рандомизация' },
-  'experiment-duration': { name: 'Длительность теста' },
-  'experiment-types': { name: 'Типы экспериментов' },
-  'statistical-tests': { name: 'Стат. тесты' },
-  'advanced-methods': { name: 'Продвинутые методы' },
-  'distribution-issues': { name: 'Проблемы распределений' },
-  'segmentation': { name: 'Сегментация' },
-  'metric-types': { name: 'Типы метрик' },
-  'metric-issues': { name: 'Проблемы метрик' },
-  'business-metrics': { name: 'Бизнес-метрики' },
-  'peeking-problem': { name: 'Проблема подглядывания' },
-  'novelty-effects': { name: 'Эффект новизны' },
-  'network-effects': { name: 'Сетевые эффекты' },
-  'practical-significance': { name: 'Практ. значимость' },
-  'causal-inference': { name: 'Причинно-следств. связь' },
+export const KEY_POINT_CONFIG: Record<KeyPoint, { name: string; description: string }> = {
+  'type-i-error': { name: 'Ошибка I рода', description: 'Ложноположительный результат (α): отвергли H0, когда она верна' },
+  'type-ii-error': { name: 'Ошибка II рода', description: 'Ложноотрицательный результат (β): не отвергли H0, когда она ложна' },
+  'statistical-power': { name: 'Стат. мощность', description: 'Способность теста обнаружить эффект, когда он есть (1-β)' },
+  'statistical-significance': { name: 'Стат. значимость', description: 'p-value < α: вероятность получить результат при H0' },
+  'multiple-testing': { name: 'Множ. тестирование', description: 'Коррекция для множественных гипотез: Bonferroni, FDR' },
+  'sample-size': { name: 'Размер выборки', description: 'Расчет необходимого количества пользователей для теста' },
+  'randomization': { name: 'Рандомизация', description: 'Случайное распределение пользователей по группам' },
+  'experiment-duration': { name: 'Длительность теста', description: 'Сколько времени нужно для достижения power' },
+  'experiment-types': { name: 'Типы экспериментов', description: 'A/B, многорукие бандиты, switchback, quasi-experiments' },
+  'statistical-tests': { name: 'Стат. тесты', description: 'T-test, z-test, chi-square, Mann-Whitney' },
+  'advanced-methods': { name: 'Продвинутые методы', description: 'CUPED, стратификация, variance reduction' },
+  'distribution-issues': { name: 'Проблемы распределений', description: 'Non-normality, skewness, heavy tails, outliers' },
+  'segmentation': { name: 'Сегментация', description: 'Анализ эффектов по подгруппам пользователей' },
+  'metric-types': { name: 'Типы метрик', description: 'Первичные, вторичные, guardrail, диагностические' },
+  'metric-issues': { name: 'Проблемы метрик', description: 'Чувствительность, стабильность, интерпретируемость' },
+  'business-metrics': { name: 'Бизнес-метрики', description: 'Revenue, retention, engagement, conversion' },
+  'peeking-problem': { name: 'Проблема подглядывания', description: 'Early stopping: остановка теста при раннем значимом результате' },
+  'novelty-effects': { name: 'Эффект новизны', description: 'Временное изменение поведения при знакомстве с новым' },
+  'network-effects': { name: 'Сетевые эффекты', description: 'Взаимное влияние пользователей друг на друга' },
+  'practical-significance': { name: 'Практ. значимость', description: 'Достаточно ли эффект велик для внедрения?' },
+  'causal-inference': { name: 'Причинно-следств. связь', description: 'Установление причинности, а не просто корреляции' },
 };
 
 
@@ -1093,9 +1137,9 @@ export const QUESTION_DATABASE: Question[] = [
 ];
 
 export const LEADERBOARD_DATA = [
-    { name: 'Alex', score: 950 },
-    { name: 'Elena', score: 870 },
-    { name: 'Mike', score: 810 },
-    { name: 'Jane', score: 750 },
-    { name: 'Sam', score: 10 },
+    { name: 'Alex', score: 95 },
+    { name: 'Elena', score: 87 },
+    { name: 'Mike', score: 81 },
+    { name: 'Jane', score: 75 },
+    { name: 'Sam', score: 68 },
 ];

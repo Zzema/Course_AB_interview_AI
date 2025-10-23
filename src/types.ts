@@ -1,12 +1,35 @@
 // FIX: Removed an incorrect import from './constants' that was causing a circular dependency.
 // The types are defined below in this file and should not be imported from a file that depends on this one.
 
+export interface LevelProgress {
+    askedQuestionIds: number[]; // ID пройденных вопросов на этом уровне
+    totalQuestions: number; // Общее количество вопросов на уровне
+    averageScore: number; // Средний балл на этом уровне
+}
+
+export interface QuestionAttempt {
+    questionId: number; // ID вопроса
+    timestamp: number; // Время ответа (Unix timestamp)
+    answer: string; // Ответ пользователя
+    feedback: Feedback; // Полная обратная связь от AI
+    earnedPoints: number; // Заработанные баллы
+    difficulty: DifficultyLevel; // Сложность вопроса (на момент ответа)
+    seniority: SeniorityLevel; // Уровень вопроса
+}
+
 export interface GameState {
     currentQuestionIndex: number;
     rating: number;
     categoryScores: Record<string, { totalScore: number; count: number }>;
     keyPointScores: Record<string, { totalScore: number; count: number }>;
     consecutiveGoodAnswersOnSimpleQuestions: number;
+    ratingHistory?: number[]; // История накопленного рейтинга после каждого вопроса
+    initialLevel?: 'junior' | 'mid' | 'senior' | 'staff'; // 🆕 Начальный уровень аналитика (фиксированный)
+    selectedDifficulty?: 'all' | 'junior' | 'mid' | 'senior' | 'staff'; // Выбранный уровень сложности вопросов
+    askedQuestionIds?: number[]; // ID уже заданных вопросов для рандомизации (для обратной совместимости)
+    currentQuestionId?: number; // ID текущего отображаемого вопроса
+    levelProgress?: Record<'junior' | 'mid' | 'senior' | 'staff', LevelProgress>; // Прогресс по каждому уровню
+    questionAttempts?: QuestionAttempt[]; // 🆕 История всех попыток ответов на вопросы
 }
 
 export interface User {
