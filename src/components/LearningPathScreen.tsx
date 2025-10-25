@@ -204,7 +204,7 @@ const LearningPathScreen: React.FC<LearningPathScreenProps> = ({
   };
 
   return (
-    <div style={{...styles.container, paddingTop: 0}}>
+    <div style={{...styles.container, paddingTop: 0, position: 'relative', top: 0}}>
       <div style={styles.header}>
         <button onClick={onBack} style={styles.backButton}>
           ← Назад к Free Practice

@@ -61,16 +61,18 @@ const GameScreen: React.FC<GameScreenProps> = ({ user, onLogout, gameState, setG
         const difficulty = gameState.selectedDifficulty || 'junior';
         const askedIds = gameState.askedQuestionIds || [];
         
-        // Фильтруем вопросы по текущему уровню
-        let currentLevelQuestions = difficulty === 'all' 
-            ? QUESTION_DATABASE 
-            : QUESTION_DATABASE.filter(q => q.seniority === difficulty);
+        let currentLevelQuestions;
         
-        // НОВОЕ: Если есть moduleFilter - фильтруем только вопросы этого модуля
+        // НОВОЕ: Если есть moduleFilter - берем ТОЛЬКО вопросы модуля (без фильтра по сложности)
         if (moduleFilter) {
-            currentLevelQuestions = currentLevelQuestions.filter(q => 
+            currentLevelQuestions = QUESTION_DATABASE.filter(q => 
                 q.modules && q.modules.includes(moduleFilter)
             );
+        } else {
+            // Обычный режим - фильтруем по уровню сложности
+            currentLevelQuestions = difficulty === 'all' 
+                ? QUESTION_DATABASE 
+                : QUESTION_DATABASE.filter(q => q.seniority === difficulty);
         }
         
         // Находим вопросы текущего уровня, которые еще не задавали
@@ -150,9 +152,13 @@ const GameScreen: React.FC<GameScreenProps> = ({ user, onLogout, gameState, setG
 
     // Скролл к началу при монтировании компонента
     useEffect(() => {
-        window.scrollTo(0, 0);
-        document.documentElement.scrollTop = 0;
-        document.body.scrollTop = 0;
+        // Небольшая задержка чтобы DOM успел отрендериться
+        const timer = setTimeout(() => {
+            window.scrollTo(0, 0);
+            document.documentElement.scrollTop = 0;
+            document.body.scrollTop = 0;
+        }, 0);
+        return () => clearTimeout(timer);
     }, []);
 
     // Обработчик изменения текста с ограничением по длине
@@ -667,26 +673,26 @@ const GameScreen: React.FC<GameScreenProps> = ({ user, onLogout, gameState, setG
                     <div style={{width: isMobile ? 'auto' : '220px', flex: isMobile ? '1' : 'initial'}}>
                         {(() => {
                             const difficulty = gameState.selectedDifficulty || 'junior';
-                            
-                            // Используем askedQuestionIds и фильтруем по текущему уровню
                             const askedIds = gameState.askedQuestionIds || [];
-                            let currentLevelQuestions = difficulty === 'all' 
-                                ? QUESTION_DATABASE 
-                                : QUESTION_DATABASE.filter(q => q.seniority === difficulty);
                             
-                            // НОВОЕ: Если есть moduleFilter - фильтруем только вопросы этого модуля
+                            let currentLevelQuestions;
+                            
+                            // НОВОЕ: Если есть moduleFilter - берем ТОЛЬКО вопросы модуля (без фильтра по сложности)
                             if (moduleFilter) {
-                                currentLevelQuestions = currentLevelQuestions.filter(q => 
+                                currentLevelQuestions = QUESTION_DATABASE.filter(q => 
                                     q.modules && q.modules.includes(moduleFilter)
                                 );
+                            } else {
+                                // Обычный режим - фильтруем по уровню сложности
+                                currentLevelQuestions = difficulty === 'all' 
+                                    ? QUESTION_DATABASE 
+                                    : QUESTION_DATABASE.filter(q => q.seniority === difficulty);
                             }
                             
-                            // Подсчитываем, сколько вопросов текущего уровня уже задано
-                            const askedThisLevel = difficulty === 'all'
-                                ? askedIds.filter(id => currentLevelQuestions.some(q => q.id === id)).length
-                                : askedIds.filter(id => 
-                                    currentLevelQuestions.some(q => q.id === id)
-                                  ).length;
+                            // Подсчитываем, сколько вопросов уже задано
+                            const askedThisLevel = askedIds.filter(id => 
+                                currentLevelQuestions.some(q => q.id === id)
+                            ).length;
                             
                             const totalThisLevel = currentLevelQuestions.length;
                             const remainingThisLevel = totalThisLevel - askedThisLevel;
