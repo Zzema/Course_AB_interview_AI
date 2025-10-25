@@ -73,7 +73,7 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
     }, [tempUser]);
 
     // --- Standard Google Sign-In Logic ---
-    const handleCredentialResponse = useCallback((response: any) => {
+    const handleCredentialResponse = useCallback(async (response: any) => {
         if (!response.credential) {
             console.error("Google Sign-In failed: No credential returned.");
             setAuthError("Произошла ошибка при входе через Google. Попробуйте еще раз.");
@@ -90,8 +90,20 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
                     family_name: userObject.family_name,
                     picture: userObject.picture,
                 };
-                // Сохраняем пользователя и показываем экран выбора уровня
-                setTempUser(user);
+                
+                // Проверяем есть ли сохраненное состояние
+                const { fetchGameState } = await import('../lib/api');
+                const existingState = await fetchGameState(user.email);
+                
+                if (existingState && existingState.selectedDifficulty) {
+                    // Если есть сохраненное состояние - сразу запускаем игру
+                    console.log('✅ Found existing game state, skipping level selection');
+                    onStart(user);
+                } else {
+                    // Новый пользователь - показываем экран выбора уровня
+                    console.log('🆕 New user, showing level selection');
+                    setTempUser(user);
+                }
             } else {
                  console.error("Failed to parse user from Google credential.");
                  setAuthError("Не удалось получить данные пользователя из ответа Google.");
@@ -100,7 +112,7 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
             console.error("Error processing Google credential:", error);
             setAuthError("Произошла ошибка при обработке данных пользователя.");
         }
-    }, []);
+    }, [onStart]);
 
     useEffect(() => {
         if (isAiStudio || isStarting || tempUser) return; // Не инициализируем если уже авторизованы
@@ -143,7 +155,20 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
     const handleAiStudioLogin = async () => {
         try {
             const userInfo = await window.aistudio!.getAuthenticatedUser();
-            setTempUser(userInfo);
+            
+            // Проверяем есть ли сохраненное состояние
+            const { fetchGameState } = await import('../lib/api');
+            const existingState = await fetchGameState(userInfo.email);
+            
+            if (existingState && existingState.selectedDifficulty) {
+                // Если есть сохраненное состояние - сразу запускаем игру
+                console.log('✅ Found existing game state, skipping level selection');
+                onStart(userInfo);
+            } else {
+                // Новый пользователь - показываем экран выбора уровня
+                console.log('🆕 New user, showing level selection');
+                setTempUser(userInfo);
+            }
         } catch(e) {
             console.error("AI Studio authentication failed:", e);
             setAuthError("Не удалось войти через AI Studio. Попробуйте обновить страницу.");
@@ -209,15 +234,6 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
                             Это определит сложность вопросов. Ваш уровень мастерства будет расти по мере прохождения.
                         </p>
                     </div>
-                    
-                    {/* Блок-прокладка, чтобы оттолкнуть грид вниз от Google кнопки */}
-                    <div style={{
-                        width: '100%',
-                        height: '40px', // Компактный отступ
-                        backgroundColor: 'var(--surface-color)',
-                        position: 'relative',
-                        zIndex: 10
-                    }}></div>
                     
                     <div style={{
                         display: 'grid',

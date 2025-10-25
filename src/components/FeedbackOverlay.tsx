@@ -217,6 +217,33 @@ const FeedbackOverlay: React.FC<FeedbackOverlayProps> = ({ feedback, onNext, old
                     </div>
                 )}
 
+                {/* Reference Answer (только для модулей) */}
+                {question.referenceAnswer && (
+                    <div style={{
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        border: '2px solid rgba(16, 185, 129, 0.3)',
+                        borderRadius: '12px',
+                        padding: window.innerWidth <= 768 ? '1rem' : '1.5rem',
+                        marginBottom: '1.5rem'
+                    }}>
+                        <h4 style={{
+                            ...styles.summaryTitle,
+                            color: '#10b981',
+                            marginBottom: '1rem',
+                            fontSize: window.innerWidth <= 768 ? '1rem' : '1.1rem'
+                        }}>
+                            📚 Эталонный ответ
+                        </h4>
+                        <div style={{
+                            fontSize: window.innerWidth <= 768 ? '0.9rem' : '1rem',
+                            lineHeight: '1.7',
+                            color: 'var(--text-primary)',
+                            whiteSpace: 'pre-wrap'
+                        }}>
+                            {question.referenceAnswer}
+                        </div>
+                    </div>
+                )}
 
                 <button onClick={onNext} style={styles.submitButton}>
                     Следующий вопрос

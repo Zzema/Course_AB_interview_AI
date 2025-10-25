@@ -1,18 +1,24 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { GameState, User, KeyPoint } from '../types';
+import { GameState, User, KeyPoint, Quest } from '../types';
 import { CATEGORIES_CONFIG, KEY_POINT_CONFIG, QUESTION_DATABASE } from '../data/constants';
 import LevelBadge from './statistics-gamified/LevelBadge';
 import XPProgressBar from './statistics-gamified/XPProgressBar';
-import QuestCard, { Quest } from './statistics-gamified/QuestCard';
+import QuestCard from './statistics-gamified/QuestCard';
 import AbilityCard from './statistics-gamified/AbilityCard';
 import SkillItem from './statistics-gamified/SkillItem';
 import Leaderboard from './Leaderboard';
+import ActivitySeriesWidget from './ActivitySeriesWidget';
+import InventoryPanel from './InventoryPanel';
+import SocialComparison from './SocialComparison';
 import { calculateLevel, scoreToLevel, getAbilityDescription } from './statistics-gamified/levelUtils';
 import { 
     calculateWeightedAverageScore, 
     calculateSimpleAverageScore,
     calculateRecentRating
 } from '../lib/xpCalculator';
+import { generateAllQuests } from '../lib/questGenerator';
+import { claimSeriesMilestone, getCurrentDateString } from '../lib/activitySeriesManager';
+import { saveGameState } from '../lib/api';
 
 interface StatisticsScreenGamifiedProps {
     user: User;
@@ -110,70 +116,61 @@ const StatisticsScreenGamified: React.FC<StatisticsScreenGamifiedProps> = ({ use
         .filter(skill => !strongestSkills.some(strong => strong.key === skill.key))
         .slice(0, 4);
 
-    // Generate quests based on game state
+    // Generate ALL quests using new unified system
     const quests = useMemo((): Quest[] => {
-        const allQuests: Quest[] = [];
-
-        // 🆘 Urgent quest for negative rating (appears only when rating < -50)
-        if (gameState.rating < -50) {
-            allQuests.push({
-                id: 'quest-recovery',
-                title: '🆘 Квест восстановления',
-                description: `Текущий опыт: ${gameState.rating}. Ответь на вопрос с оценкой 6+, чтобы получить +50 опыта!`,
-                progress: { 
-                    current: Math.max(0, gameState.rating + 50), 
-                    total: 50 
-                },
-                reward: 50,
-                completed: false,
-                urgent: true
-            });
-        }
-
-        // Regular quests
-        allQuests.push(
-            {
-                id: 'quest-50-questions',
-                title: 'Ответь на 50 вопросов',
-                description: `Прогресс: ${totalQuestionsAnswered}/50`,
-                progress: { current: totalQuestionsAnswered, total: 50 },
-                reward: 200,
-                completed: totalQuestionsAnswered >= 50
-            },
-            {
-                id: 'quest-category-80',
-                title: 'Достигни 80% в любой категории',
-                description: `Лучшая категория: ${Math.round(Math.max(...abilities.map(a => a.score), 0))}%`,
-                progress: { 
-                    current: Math.min(Math.max(...abilities.map(a => a.score), 0), 80), 
-                    total: 80 
-                },
-                reward: 150,
-                completed: abilities.some(a => a.score >= 80)
-            },
-            {
-                id: 'quest-avg-8',
-                title: 'Средняя оценка за ответ выше 8/10',
-                description: `Текущая: ${averageOverallScore.toFixed(1)}/10`,
-                progress: { 
-                    current: Math.min(averageOverallScore, 8), 
-                    total: 8 
-                },
-                reward: 100,
-                completed: averageOverallScore >= 8.0
-            },
-            {
-                id: 'quest-100-questions',
-                title: 'Ответь на 100 вопросов',
-                description: `Прогресс: ${totalQuestionsAnswered}/100`,
-                progress: { current: totalQuestionsAnswered, total: 100 },
-                reward: 500,
-                completed: totalQuestionsAnswered >= 100
+        return generateAllQuests(gameState, getCurrentDateString());
+    }, [gameState]);
+    
+    // Группируем квесты по типам для отображения
+    const dailyQuests = useMemo(() => quests.filter(q => q.type === 'daily'), [quests]);
+    const achievementQuests = useMemo(() => quests.filter(q => q.type === 'achievement'), [quests]);
+    const milestoneQuests = useMemo(() => quests.filter(q => q.type === 'milestone'), [quests]);
+    
+    // Обработчик претензии наград за серии
+    const handleClaimSeriesReward = async (questId: string) => {
+        const match = questId.match(/^series-(\d+)$/);
+        if (!match || !gameState.activitySeries) return;
+        
+        const days = parseInt(match[1]);
+        const milestone = gameState.activitySeries.seriesMilestones.find(m => m.days === days);
+        if (!milestone || !milestone.unlocked || milestone.claimed) return;
+        
+        // Обновляем серию и инвентарь/рейтинг
+        const updatedSeries = claimSeriesMilestone(gameState.activitySeries, days);
+        
+        let updatedRating = gameState.rating;
+        let updatedInventory = gameState.inventory || { questionSkips: 0, seriesProtection: 0 };
+        
+        // Применяем награду
+        if (milestone.reward.type === 'xp') {
+            updatedRating += milestone.reward.value;
+        } else if (milestone.reward.type === 'item' && milestone.reward.itemType) {
+            if (milestone.reward.itemType === 'question_skip') {
+                updatedInventory = {
+                    ...updatedInventory,
+                    questionSkips: updatedInventory.questionSkips + milestone.reward.value
+                };
+            } else if (milestone.reward.itemType === 'series_protection') {
+                updatedInventory = {
+                    ...updatedInventory,
+                    seriesProtection: updatedInventory.seriesProtection + milestone.reward.value
+                };
             }
-        );
-
-        return allQuests;
-    }, [totalQuestionsAnswered, abilities, averageOverallScore, gameState.rating]);
+        }
+        
+        const updatedGameState = {
+            ...gameState,
+            activitySeries: updatedSeries,
+            rating: updatedRating,
+            inventory: updatedInventory
+        };
+        
+        // Сохраняем в Firebase
+        await saveGameState(user.email, updatedGameState);
+        
+        // Обновляем локально (через onBack и повторный рендер)
+        window.location.reload();
+    };
 
     // Styles
     const containerStyle: React.CSSProperties = {
@@ -487,11 +484,52 @@ const StatisticsScreenGamified: React.FC<StatisticsScreenGamifiedProps> = ({ use
                 {/* Content based on active tab */}
                 {activeTab === 'stats' && (
                     <>
-                        {/* Quests Section */}
-                <h2 style={sectionTitleStyle}>🎮 Текущие квесты</h2>
-                {quests.map(quest => (
-                    <QuestCard key={quest.id} quest={quest} />
-                ))}
+                        {/* Social Comparison */}
+                        <SocialComparison gameState={gameState} />
+                        
+                        {/* Activity Series Widget */}
+                        {gameState.activitySeries && (
+                            <ActivitySeriesWidget series={gameState.activitySeries} />
+                        )}
+                        
+                        {/* Inventory Panel */}
+                        {gameState.inventory && (
+                            <InventoryPanel inventory={gameState.inventory} />
+                        )}
+                        
+                        {/* Daily Quest Section */}
+                        {dailyQuests.length > 0 && (
+                            <>
+                                <h2 style={sectionTitleStyle}>📅 Ежедневное задание</h2>
+                                {dailyQuests.map(quest => (
+                                    <QuestCard key={quest.id} quest={quest} />
+                                ))}
+                            </>
+                        )}
+                        
+                        {/* Achievement Quests (Series Rewards) */}
+                        {achievementQuests.length > 0 && (
+                            <>
+                                <h2 style={sectionTitleStyle}>🏆 Награды за достижения</h2>
+                                {achievementQuests.map(quest => (
+                                    <QuestCard 
+                                        key={quest.id} 
+                                        quest={quest}
+                                        onClaim={handleClaimSeriesReward}
+                                    />
+                                ))}
+                            </>
+                        )}
+                        
+                        {/* Milestone Quests */}
+                        {milestoneQuests.length > 0 && (
+                            <>
+                                <h2 style={sectionTitleStyle}>🎯 Долгосрочные цели</h2>
+                                {milestoneQuests.map(quest => (
+                                    <QuestCard key={quest.id} quest={quest} />
+                                ))}
+                            </>
+                        )}
 
                 {/* Abilities Section */}
                 <h2 style={sectionTitleStyle}>⚔️ Способности аналитика</h2>
@@ -874,7 +912,7 @@ const StatisticsScreenGamified: React.FC<StatisticsScreenGamifiedProps> = ({ use
                         </h2>
                         
                         <div style={{ fontSize: isMobile ? '0.9rem' : '1rem', lineHeight: '1.6', color: 'rgba(255, 255, 255, 0.9)' }}>
-                            <p><strong style={{ color: '#a0e7a0' }}>За хорошие ответы (оценка ≥ 6):</strong></p>
+                            <p><strong style={{ color: '#a0e7a0' }}>За хорошие ответы (оценка ≥ 4):</strong></p>
                             <div style={{ 
                                 background: 'rgba(160, 231, 160, 0.1)', 
                                 padding: '1rem', 
@@ -882,19 +920,20 @@ const StatisticsScreenGamified: React.FC<StatisticsScreenGamifiedProps> = ({ use
                                 marginBottom: '1rem',
                                 border: '1px solid rgba(160, 231, 160, 0.2)'
                             }}>
-                                <code style={{ fontSize: '1.1rem' }}>XP = 10 × сложность × (оценка / 10)</code>
+                                <code style={{ fontSize: '1.1rem' }}>XP = 5 × сложность × (оценка / 10)</code>
                             </div>
                             
                             <p style={{ fontSize: '0.9rem', fontStyle: 'italic', color: 'rgba(255, 255, 255, 0.7)' }}>
                                 Примеры:
                             </p>
                             <ul style={{ fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.7)' }}>
-                                <li>Сложность 5, оценка 8 → <strong style={{ color: '#a0e7a0' }}>+40 XP</strong></li>
-                                <li>Сложность 10, оценка 10 → <strong style={{ color: '#a0e7a0' }}>+100 XP</strong></li>
-                                <li>Сложность 3, оценка 7 → <strong style={{ color: '#a0e7a0' }}>+21 XP</strong></li>
+                                <li>Сложность 1, оценка 10 → <strong style={{ color: '#a0e7a0' }}>+5 XP</strong></li>
+                                <li>Сложность 5, оценка 8 → <strong style={{ color: '#a0e7a0' }}>+20 XP</strong></li>
+                                <li>Сложность 10, оценка 10 → <strong style={{ color: '#a0e7a0' }}>+50 XP</strong></li>
+                                <li>Сложность 5, оценка 4 → <strong style={{ color: '#a0e7a0' }}>+10 XP</strong></li>
                             </ul>
 
-                            <p style={{ marginTop: '1.5rem' }}><strong style={{ color: '#ff6b6b' }}>За плохие ответы (оценка &lt; 6):</strong></p>
+                            <p style={{ marginTop: '1.5rem' }}><strong style={{ color: '#ff6b6b' }}>За плохие ответы (оценка &lt; 4):</strong></p>
                             <div style={{ 
                                 background: 'rgba(255, 107, 107, 0.1)', 
                                 padding: '1rem', 
@@ -902,16 +941,17 @@ const StatisticsScreenGamified: React.FC<StatisticsScreenGamifiedProps> = ({ use
                                 marginBottom: '1rem',
                                 border: '1px solid rgba(255, 107, 107, 0.2)'
                             }}>
-                                <code style={{ fontSize: '1.1rem' }}>XP = -5 × сложность × ((6 - оценка) / 6)</code>
+                                <code style={{ fontSize: '1.1rem' }}>XP = -3 × сложность × ((4 - оценка) / 4)</code>
                             </div>
                             
                             <p style={{ fontSize: '0.9rem', fontStyle: 'italic', color: 'rgba(255, 255, 255, 0.7)' }}>
                                 Примеры:
                             </p>
                             <ul style={{ fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.7)' }}>
-                                <li>Сложность 5, оценка 5 → <strong style={{ color: '#ff6b6b' }}>-4 XP</strong></li>
-                                <li>Сложность 5, оценка 3 → <strong style={{ color: '#ff6b6b' }}>-12 XP</strong></li>
-                                <li>Сложность 10, оценка 2 → <strong style={{ color: '#ff6b6b' }}>-33 XP</strong></li>
+                                <li>Сложность 5, оценка 3 → <strong style={{ color: '#ff6b6b' }}>-4 XP</strong></li>
+                                <li>Сложность 5, оценка 2 → <strong style={{ color: '#ff6b6b' }}>-8 XP</strong></li>
+                                <li>Сложность 5, оценка 0 → <strong style={{ color: '#ff6b6b' }}>-15 XP</strong></li>
+                                <li>Сложность 10, оценка 1 → <strong style={{ color: '#ff6b6b' }}>-23 XP</strong></li>
                             </ul>
 
                             <div style={{
@@ -923,7 +963,7 @@ const StatisticsScreenGamified: React.FC<StatisticsScreenGamifiedProps> = ({ use
                             }}>
                                 <p style={{ margin: 0, fontSize: '0.9rem' }}>
                                     <strong style={{ color: '#c4b5fd' }}>💡 Как растить опыт:</strong><br/>
-                                    • Отвечайте на вопросы с оценкой 6+ для получения XP<br/>
+                                    • Отвечайте на вопросы с оценкой 4+ для получения XP<br/>
                                     • Более сложные вопросы дают больше XP<br/>
                                     • Качество ответа важнее количества<br/>
                                     • Плохие ответы отнимают XP - будьте внимательны!

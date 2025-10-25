@@ -3,8 +3,11 @@ import UserSetup from './components/UserSetup';
 import ProgressSummary from './components/ProgressSummary';
 import GameScreen from './components/GameScreen';
 import StatisticsScreen from './components/StatisticsScreenGamified';
+import LearningPathScreen from './components/LearningPathScreen';
+import ModuleDetailScreen from './components/ModuleDetailScreen';
 import * as api from './lib/api';
 import { GameState, Session, User } from './types';
+import { checkAndUpdateSeries, getCurrentDateString } from './lib/activitySeriesManager';
 
 // Define google on the window object for TypeScript
 declare global {
@@ -15,9 +18,17 @@ declare global {
 
 function App() {
     const [session, setSession] = useState<Session | null>(null);
-    const [view, setView] = useState<'login' | 'summary' | 'game' | 'stats'>('login');
+    const [view, setView] = useState<'login' | 'summary' | 'game' | 'stats' | 'learningPath' | 'moduleDetail' | 'moduleGame'>('login');
     const [previousView, setPreviousView] = useState<'summary' | 'game'>('summary');
     const [isStarting, setIsStarting] = useState(true);
+    const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
+
+    // Скролл к началу при смене view
+    useEffect(() => {
+        window.scrollTo(0, 0);
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+    }, [view]);
 
     useEffect(() => {
         const savedUserString = localStorage.getItem('ab-hero-user');
@@ -148,20 +159,43 @@ function App() {
                     }
                 }
                 
+                // НОВОЕ: Проверяем и обновляем серию активности при логине
+                console.log('🔥 Checking activity series...');
+                const currentDate = getCurrentDateString();
+                const { series, status, previousSeries } = checkAndUpdateSeries(existingState, currentDate);
+                
+                console.log('🔥 Series status:', status, {
+                    currentSeries: series.currentSeries,
+                    previousSeries,
+                    todayCompleted: series.todayCompleted
+                });
+                
+                existingState.activitySeries = series;
+                
+                // TODO: Показать модалку если серия прервана (status === 'broken' && previousSeries > 3)
+                // Это будет реализовано в Этапе 3
+                
                 setSession({ user, gameState: existingState });
-                if (existingState.currentQuestionIndex > 0) {
+                // Показываем summary если пользователь уже отвечал на вопросы
+                if (existingState.questionAttempts && existingState.questionAttempts.length > 0) {
                     setView('summary');
                 } else {
                     setView('game');
                 }
             } else {
-                // Новый пользователь - создаем состояние с выбранным уровнем
+                // Новый пользователь
+                // Если уровень еще не выбран - показываем экран выбора (view остается 'login')
+                if (!selectedLevel) {
+                    console.log('🔵 New user, waiting for level selection...');
+                    setIsStarting(false);
+                    return;
+                }
+                
+                // Создаем состояние с выбранным уровнем
                 console.log('🔵 Creating new game state for new user...');
                 const newGameState = api.createInitialGameState();
-                if (selectedLevel) {
-                    console.log('🔵 Setting selected difficulty:', selectedLevel);
-                    newGameState.selectedDifficulty = selectedLevel;
-                }
+                console.log('🔵 Setting selected difficulty:', selectedLevel);
+                newGameState.selectedDifficulty = selectedLevel;
                 console.log('🔵 Setting session...');
                 setSession({ user, gameState: newGameState });
                 console.log('🔵 Setting view to game...');
@@ -227,6 +261,18 @@ function App() {
                             gameState={session.gameState}
                             setGameState={handleUpdateGameState}
                             onShowStats={() => { setPreviousView('game'); setView('stats'); }}
+                            onShowLearningPath={() => setView('learningPath')}
+                       />;
+            case 'moduleGame':
+                if (!session || !selectedModuleId) return null;
+                return <GameScreen 
+                            user={session.user} 
+                            onLogout={handleLogout} 
+                            gameState={session.gameState}
+                            setGameState={handleUpdateGameState}
+                            onShowStats={() => { setPreviousView('moduleGame'); setView('stats'); }}
+                            moduleFilter={selectedModuleId}
+                            onExitModule={() => setView('moduleDetail')}
                        />;
             case 'stats':
                  if (!session) return null;
@@ -235,16 +281,33 @@ function App() {
                             gameState={session.gameState}
                             onBack={() => setView(previousView)}
                         />
+            case 'learningPath':
+                if (!session) return null;
+                return <LearningPathScreen
+                            gameState={session.gameState}
+                            onSelectModule={(moduleId) => {
+                                setSelectedModuleId(moduleId);
+                                setView('moduleDetail');
+                            }}
+                            onBack={() => setView('game')}
+                        />
+            case 'moduleDetail':
+                if (!session || !selectedModuleId) return null;
+                return <ModuleDetailScreen
+                            gameState={session.gameState}
+                            moduleId={selectedModuleId}
+                            onBack={() => setView('learningPath')}
+                            onStartQuestions={(moduleId) => {
+                                setSelectedModuleId(moduleId);
+                                setView('moduleGame');
+                            }}
+                        />
             default:
                 return null;
         }
     };
 
-    return (
-        <>
-            {renderContent()}
-        </>
-    );
+    return renderContent();
 }
 
 export default App;

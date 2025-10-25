@@ -162,6 +162,19 @@ const Leaderboard: React.FC<LeaderboardProps> = ({
 
     return (
         <div style={styles.questionCard}>
+            <style>{`
+                .leaderboard-table * {
+                    pointer-events: none !important;
+                    user-select: none !important;
+                    -webkit-user-select: none !important;
+                    -webkit-touch-callout: none !important;
+                }
+                .leaderboard-table a {
+                    pointer-events: none !important;
+                    text-decoration: none !important;
+                    color: inherit !important;
+                }
+            `}</style>
             <h3 style={{ marginBottom: '1rem', fontFamily: 'var(--font-display)', color: 'var(--secondary-color)' }}>
                 Таблица лидеров
             </h3>
@@ -173,7 +186,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({
             }}>
                 🎯 Уровень: {difficultyLabel} Analyst
             </div>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <table className="leaderboard-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <tbody>
                     {leaderboardData.map((player, displayIndex) => {
                         const levelIcons = {
@@ -221,11 +234,15 @@ const Leaderboard: React.FC<LeaderboardProps> = ({
                                     style={{ 
                                         padding: '0.75rem 0.5rem',
                                         fontWeight: player.isCurrentUser ? 'bold' : 'normal',
-                                        cursor: player.email ? 'help' : 'default'
+                                        cursor: player.email ? 'help' : 'default',
+                                        pointerEvents: 'none',
+                                        userSelect: 'none'
                                     }}
                                     title={player.email || undefined}
                                 >
-                                    {player.position}. {player.name} {player.isCurrentUser && '👤'}
+                                    <span style={{ pointerEvents: 'none' }}>
+                                        {player.position}. {player.name} {player.isCurrentUser && '👤'}
+                                    </span>
                                 </td>
                                 {selectedDifficulty === 'all' && (
                                     <td style={{

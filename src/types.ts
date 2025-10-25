@@ -18,7 +18,6 @@ export interface QuestionAttempt {
 }
 
 export interface GameState {
-    currentQuestionIndex: number;
     rating: number; // Опыт игрока (может быть положительным и отрицательным)
     categoryScores: Record<string, { totalScore: number; count: number }>;
     keyPointScores: Record<string, { totalScore: number; count: number }>;
@@ -29,6 +28,14 @@ export interface GameState {
     currentQuestionId?: number; // ID текущего отображаемого вопроса
     levelProgress?: Record<'junior' | 'mid' | 'senior' | 'staff', LevelProgress>; // Прогресс по каждому уровню
     questionAttempts?: QuestionAttempt[]; // История всех попыток ответов на вопросы
+    
+    // НОВЫЕ ПОЛЯ ДЛЯ СИСТЕМЫ ЕЖЕДНЕВНЫХ КВЕСТОВ И СЕРИЙ АКТИВНОСТИ
+    activitySeries?: ActivitySeries; // Данные о серии ежедневной активности
+    inventory?: Inventory; // Инвентарь с предметами (пропуски, защиты и т.д.)
+    completedDailyQuests?: string[]; // История выполненных ежедневных квестов (для аналитики)
+    
+    // LEARNING PATH (СТРУКТУРИРОВАННОЕ ОБУЧЕНИЕ)
+    learningProgress?: UserLearningProgress; // Прогресс по модулям
 }
 
 export interface User {
@@ -62,10 +69,12 @@ export interface Question {
   id: number;
   difficulty: DifficultyLevel;
   seniority: SeniorityLevel;
-  categories: Category[];
   text: string;
   bigTech: BigTechCompany[];
   keyPoints?: KeyPoint[];
+  modules: string[]; // ['1.1', '2.3'] - PRIMARY: связь с Learning Path модулями
+  referenceAnswer?: string; // Эталонный ответ для обучающего режима (в модулях)
+  // categories вычисляются динамически через getCategoriesFromModules()
 }
 
 export type DifficultyLevel = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
@@ -109,3 +118,151 @@ export type KeyPoint =
   | 'network-effects'
   | 'practical-significance'
   | 'causal-inference';
+
+// ============================================================================
+// ТИПЫ ДЛЯ СИСТЕМЫ КВЕСТОВ И ЕЖЕДНЕВНОЙ АКТИВНОСТИ
+// ============================================================================
+
+/**
+ * Квест - задание для пользователя
+ * Используется для всех типов квестов: ежедневные, долгосрочные, достижения
+ */
+export interface Quest {
+  id: string; // Уникальный ID квеста
+  title: string; // Заголовок квеста
+  description: string; // Описание квеста
+  progress: { current: number; total: number }; // Прогресс выполнения
+  reward: number; // Основная награда в XP
+  completed: boolean; // Выполнен ли квест
+  urgent?: boolean; // Срочный квест (красная подсветка)
+  
+  // НОВЫЕ ПОЛЯ:
+  type: 'daily' | 'weekly' | 'milestone' | 'achievement'; // Тип квеста
+  expiresAt?: number; // Unix timestamp истечения (для ежедневных квестов)
+  rewards?: QuestReward[]; // Детализированные награды (XP + предметы)
+}
+
+/**
+ * Награда за квест
+ * Может быть XP или предмет из инвентаря
+ */
+export interface QuestReward {
+  type: 'xp' | 'item'; // Тип награды
+  value: number; // Количество (XP или предметов)
+  itemType?: 'question_skip' | 'series_protection'; // Тип предмета
+  description: string; // Описание награды для отображения
+}
+
+/**
+ * Система серий активности (замена "стрик")
+ * Отслеживает ежедневную активность пользователя
+ */
+export interface ActivitySeries {
+  currentSeries: number; // Текущая серия дней подряд
+  longestSeries: number; // Рекордная серия дней
+  lastActiveDate: string; // YYYY-MM-DD последней активности
+  todayCompleted: boolean; // Выполнен ли сегодняшний ежедневный квест
+  seriesMilestones: SeriesMilestone[]; // Награды за milestone'ы серии
+}
+
+/**
+ * Milestone серии - награда за определенное количество дней подряд
+ */
+export interface SeriesMilestone {
+  days: number; // Количество дней для достижения (3, 7, 14, 30)
+  reward: QuestReward; // Награда за достижение
+  unlocked: boolean; // Достигнут ли milestone
+  claimed: boolean; // Получена ли награда (пользователь кликнул "Забрать")
+}
+
+/**
+ * Инвентарь пользователя
+ * Хранит предметы, которые можно использовать
+ */
+export interface Inventory {
+  questionSkips: number; // "🎲 Пропуск вопроса" - позволяет пропустить текущий вопрос
+  seriesProtection: number; // "🛡️ Защита серии" - защищает от потери серии на 1 день
+}
+
+// ============================================================================
+// ТИПЫ ДЛЯ LEARNING PATH (СТРУКТУРИРОВАННОЕ ОБУЧЕНИЕ)
+// ============================================================================
+
+/**
+ * Модуль обучения - группа вопросов по одной теме
+ */
+export interface LearningModule {
+  id: string; // '1.1', '2.3' etc
+  level: 1 | 2 | 3; // Foundation / Practitioner / Expert
+  category: Category; // Доминирующая категория модуля
+  title: string;
+  description: string;
+  theoryContent: string; // Markdown теория
+  questionIds: number[]; // Вопросы модуля
+  checkpointCriteria: {
+    minAvgScore: number; // Минимальная средняя оценка для прохождения
+    minQuestionsCompleted: number; // Минимум вопросов для прохождения
+  };
+  unlockRequirements?: string[]; // Модули, которые нужно пройти для разблокировки
+}
+
+/**
+ * Checkpoint - экзамен после модуля или уровня
+ */
+export interface Checkpoint {
+  id: string; // 'checkpoint-1.1', 'checkpoint-level-1'
+  type: 'module' | 'level';
+  moduleId?: string; // Для module checkpoint
+  levelId?: number; // Для level checkpoint
+  questionIds: number[]; // Вопросы экзамена
+  minScore: number; // Минимальная средняя оценка для прохождения
+  reward: {
+    badge: string; // ID badge
+    badgeTitle: string; // Название badge
+    certificate: boolean; // Выдавать ли сертификат
+    xp: number; // Бонусный XP
+  };
+}
+
+/**
+ * Уровень обучения (Foundation/Practitioner/Expert)
+ */
+export interface LearningLevel {
+  id: 1 | 2 | 3;
+  title: string;
+  description: string;
+  modules: LearningModule[];
+  finalCheckpoint: Checkpoint;
+}
+
+/**
+ * Весь Learning Path
+ */
+export interface LearningPath {
+  levels: LearningLevel[];
+}
+
+/**
+ * Прогресс пользователя по одному модулю
+ */
+export interface ModuleProgress {
+  moduleId: string;
+  startedAt: number; // timestamp
+  completedAt?: number; // timestamp
+  answeredQuestionIds: number[]; // Отвеченные вопросы
+  questionScores: Record<number, number>; // questionId -> последняя оценка
+  avgScore: number; // Средняя оценка по модулю
+  checkpointCompleted: boolean; // Пройден ли checkpoint модуля
+}
+
+/**
+ * Прогресс пользователя по всему Learning Path
+ */
+export interface UserLearningProgress {
+  currentLevel: 1 | 2 | 3; // Текущий уровень
+  currentModuleId: string; // Текущий модуль (последний активный)
+  completedModuleIds: string[]; // Завершенные модули
+  completedCheckpointIds: string[]; // Пройденные checkpoints
+  moduleProgress: Record<string, ModuleProgress>; // Прогресс по каждому модулю
+  earnedBadges: string[]; // Полученные badges
+}

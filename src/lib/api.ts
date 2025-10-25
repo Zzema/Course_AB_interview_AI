@@ -2,6 +2,8 @@ import { GameState, LevelProgress } from '../types';
 import { CATEGORIES_CONFIG, KEY_POINT_TO_CATEGORY_MAP, QUESTION_DATABASE } from '../data/constants';
 import { db } from '../config/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { initializeActivitySeries } from './activitySeriesManager';
+import { initializeLearningProgress } from './learningPathManager';
 
 const DB_KEY = 'ab-hero-database';
 const USE_FIREBASE = true; // Firebase включен
@@ -24,6 +26,27 @@ export const fetchGameState = async (email: string): Promise<GameState | null> =
             if (docSnap.exists()) {
                 console.log('✅ Data loaded from Firebase');
                 const data = docSnap.data() as GameState;
+                
+                // МИГРАЦИЯ: Добавляем новые поля если их нет
+                if (!data.activitySeries) {
+                    console.log('🔄 Migrating: adding activitySeries');
+                    data.activitySeries = initializeActivitySeries();
+                }
+                if (!data.inventory) {
+                    console.log('🔄 Migrating: adding inventory');
+                    data.inventory = {
+                        questionSkips: 0,
+                        seriesProtection: 0
+                    };
+                }
+                if (!data.completedDailyQuests) {
+                    console.log('🔄 Migrating: adding completedDailyQuests');
+                    data.completedDailyQuests = [];
+                }
+                if (!data.learningProgress) {
+                    console.log('🔄 Migrating: adding learningProgress');
+                    data.learningProgress = initializeLearningProgress();
+                }
                 
                 // Also save to localStorage as backup
                 const localDb = localStorage.getItem(DB_KEY);
@@ -106,7 +129,6 @@ export const createInitialGameState = (): GameState => {
     };
 
     return {
-        currentQuestionIndex: 0,
         rating: 0,
         categoryScores: Object.keys(CATEGORIES_CONFIG).reduce((acc, key) => {
             acc[key] = { totalScore: 0, count: 0 };
@@ -121,6 +143,14 @@ export const createInitialGameState = (): GameState => {
         initialLevel: 'junior',
         selectedDifficulty: 'junior',
         levelProgress,
-        questionAttempts: []
+        questionAttempts: [],
+        // НОВЫЕ ПОЛЯ:
+        activitySeries: initializeActivitySeries(),
+        inventory: {
+            questionSkips: 0,
+            seriesProtection: 0
+        },
+        completedDailyQuests: [],
+        learningProgress: initializeLearningProgress()
     };
 };

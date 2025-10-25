@@ -2,6 +2,11 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 
+// Отключаем автоматическое восстановление позиции скролла
+if ('scrollRestoration' in history) {
+  history.scrollRestoration = 'manual';
+}
+
 const root = createRoot(document.getElementById('root')!);
 
 const styleSheet = document.createElement("style");

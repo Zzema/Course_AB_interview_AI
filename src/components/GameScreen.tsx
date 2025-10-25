@@ -7,6 +7,12 @@ import { styles } from '../styles';
 import { createInitialGameState } from '../lib/api';
 import FeedbackOverlay from './FeedbackOverlay';
 import { calculateXP } from '../lib/xpCalculator';
+import { isDailyQuestCompleted } from '../lib/questGenerator';
+import { completeDailyQuest, getCurrentDateString } from '../lib/activitySeriesManager';
+import { syncQuestionAnswerToModules } from '../lib/learningPathManager';
+import ActivitySeriesWidget from './ActivitySeriesWidget';
+import InventoryPanel from './InventoryPanel';
+import { getCategoriesFromModules } from '../lib/categoryHelper';
 
 interface GameScreenProps {
     user: User;
@@ -14,6 +20,9 @@ interface GameScreenProps {
     gameState: GameState;
     setGameState: (state: GameState) => void;
     onShowStats: () => void;
+    onShowLearningPath?: () => void;
+    moduleFilter?: string; // ID модуля для фильтрации вопросов (например "1.1")
+    onExitModule?: () => void; // Callback для выхода из режима модуля
 }
 
 const SIMPLE_QUESTION_DIFFICULTY = 4;
@@ -30,7 +39,7 @@ const MIN_ANSWER_LENGTH = 100;
 const RECOMMENDED_MAX_LENGTH = 800;
 const HARD_MAX_LENGTH = 1000;
 
-const GameScreen: React.FC<GameScreenProps> = ({ user, onLogout, gameState, setGameState, onShowStats }) => {
+const GameScreen: React.FC<GameScreenProps> = ({ user, onLogout, gameState, setGameState, onShowStats, onShowLearningPath, moduleFilter, onExitModule }) => {
     const [answer, setAnswer] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [feedback, setFeedback] = useState<Feedback | null>(null);
@@ -53,9 +62,16 @@ const GameScreen: React.FC<GameScreenProps> = ({ user, onLogout, gameState, setG
         const askedIds = gameState.askedQuestionIds || [];
         
         // Фильтруем вопросы по текущему уровню
-        const currentLevelQuestions = difficulty === 'all' 
+        let currentLevelQuestions = difficulty === 'all' 
             ? QUESTION_DATABASE 
             : QUESTION_DATABASE.filter(q => q.seniority === difficulty);
+        
+        // НОВОЕ: Если есть moduleFilter - фильтруем только вопросы этого модуля
+        if (moduleFilter) {
+            currentLevelQuestions = currentLevelQuestions.filter(q => 
+                q.modules && q.modules.includes(moduleFilter)
+            );
+        }
         
         // Находим вопросы текущего уровня, которые еще не задавали
         const availableQuestions = currentLevelQuestions.filter(q => !askedIds.includes(q.id));
@@ -116,7 +132,6 @@ const GameScreen: React.FC<GameScreenProps> = ({ user, onLogout, gameState, setG
                     setGameState({
                         ...gameState,
                         selectedDifficulty: nextLevel,
-                        currentQuestionIndex: 0,
                         currentQuestionId: undefined, // Сбрасываем текущий вопрос при повышении уровня
                     });
                 }, 100);
@@ -131,6 +146,13 @@ const GameScreen: React.FC<GameScreenProps> = ({ user, onLogout, gameState, setG
         };
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
+    // Скролл к началу при монтировании компонента
+    useEffect(() => {
+        window.scrollTo(0, 0);
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
     }, []);
 
     // Обработчик изменения текста с ограничением по длине
@@ -182,6 +204,35 @@ const GameScreen: React.FC<GameScreenProps> = ({ user, onLogout, gameState, setG
         };
     };
 
+    // Обработчик пропуска вопроса
+    const handleSkipQuestion = () => {
+        if (!gameState.inventory || gameState.inventory.questionSkips <= 0) {
+            alert('У вас нет доступных пропусков вопроса! Получите их за выполнение ежедневных заданий.');
+            return;
+        }
+        
+        const confirm = window.confirm('Использовать пропуск вопроса? Вы получите новый вопрос вместо текущего.');
+        if (!confirm) return;
+        
+        // Уменьшаем количество пропусков
+        const updatedInventory = {
+            ...gameState.inventory,
+            questionSkips: gameState.inventory.questionSkips - 1
+        };
+        
+        // Сбрасываем текущий вопрос и ответ
+        setGameState({
+            ...gameState,
+            inventory: updatedInventory,
+            currentQuestionId: undefined // выбрать новый вопрос
+        });
+        setAnswer('');
+        
+        // Показываем уведомление
+        setLevelUpNotification('🎲 Новый вопрос загружен!');
+        setTimeout(() => setLevelUpNotification(null), 2000);
+    };
+    
     const evaluateAnswer = useCallback(async () => {
         if (!answer.trim()) return;
         
@@ -201,7 +252,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ user, onLogout, gameState, setG
                 КОНТЕКСТ ВОПРОСА:
                 - Вопрос: "${currentQuestion.text}"
                 - Ключевые моменты для проверки (самое важное!): ${currentQuestion.keyPoints?.join(', ') || 'Нет специфичных'}
-                - Категории вопроса: ${currentQuestion.categories.map(c => CATEGORIES_CONFIG[c as Category].name).join(', ')}
+                - Категории вопроса: ${getCategoriesFromModules(currentQuestion.modules).map(c => CATEGORIES_CONFIG[c as Category].name).join(', ')}
 
                 ОТВЕТ КАНДИДATA:
                 "${answer}"
@@ -344,7 +395,8 @@ const GameScreen: React.FC<GameScreenProps> = ({ user, onLogout, gameState, setG
             
             const newQuestionAttempts = [...(gameState.questionAttempts || []), questionAttempt];
             
-            setGameState({
+            // Синхронизируем прогресс с Learning Path модулями
+            let updatedGameState = {
                 ...gameState,
                 rating: newRating,
                 categoryScores: newCategoryScores,
@@ -352,7 +404,16 @@ const GameScreen: React.FC<GameScreenProps> = ({ user, onLogout, gameState, setG
                 consecutiveGoodAnswersOnSimpleQuestions: newStreak,
                 ratingHistory: newRatingHistory,
                 questionAttempts: newQuestionAttempts,
-            });
+            };
+            
+            // Обновляем прогресс модулей на основе ответа
+            updatedGameState = syncQuestionAnswerToModules(
+                updatedGameState, 
+                currentQuestion.id, 
+                parsedFeedback.overallScore
+            );
+            
+            setGameState(updatedGameState);
 
         } catch (error: any) {
             console.error("Error evaluating answer:", error);
@@ -383,7 +444,6 @@ const GameScreen: React.FC<GameScreenProps> = ({ user, onLogout, gameState, setG
         setGameState({
             ...gameState,
             selectedDifficulty: difficulty,
-            currentQuestionIndex: 0,
             askedQuestionIds: [], // Сбрасываем историю вопросов при смене уровня
             currentQuestionId: undefined, // Сбрасываем текущий вопрос
         });
@@ -413,13 +473,31 @@ const GameScreen: React.FC<GameScreenProps> = ({ user, onLogout, gameState, setG
                         QUESTION_DATABASE.filter(q => q.seniority === currentLevel).length
                 }
             };
+            
+            // НОВОЕ: Проверяем, не выполнен ли ежедневный квест
+            let updatedActivitySeries = gameState.activitySeries;
+            const currentDate = getCurrentDateString();
+            
+            // Проверяем выполнение daily quest
+            if (gameState.activitySeries && !gameState.activitySeries.todayCompleted) {
+                const isDailyCompleted = isDailyQuestCompleted(gameState, currentDate);
+                
+                if (isDailyCompleted) {
+                    console.log('✅ Daily quest completed!');
+                    updatedActivitySeries = completeDailyQuest(gameState.activitySeries);
+                    
+                    // Показываем уведомление
+                    setLevelUpNotification('🎉 Ежедневное задание выполнено!');
+                    setTimeout(() => setLevelUpNotification(null), 3000);
+                }
+            }
 
-        setGameState({
-            ...gameState,
+            setGameState({
+                ...gameState,
                 askedQuestionIds: updatedAskedIds,
-                currentQuestionIndex: gameState.currentQuestionIndex + 1,
                 currentQuestionId: undefined, // Сбрасываем, чтобы выбрать новый вопрос
-                levelProgress: updatedLevelProgress
+                levelProgress: updatedLevelProgress,
+                activitySeries: updatedActivitySeries
             });
         }
     };
@@ -504,12 +582,31 @@ const GameScreen: React.FC<GameScreenProps> = ({ user, onLogout, gameState, setG
                                 'staff': '👑 Staff'
                             }[gameState.selectedDifficulty || 'all'])}
                         </div>
+                        
+                        {/* Компактный виджет серии */}
+                        {gameState.activitySeries && !isMobile && (
+                            <ActivitySeriesWidget series={gameState.activitySeries} compact />
+                        )}
+                        
+                        {/* Компактный инвентарь */}
+                        {gameState.inventory && !isMobile && (
+                            <InventoryPanel inventory={gameState.inventory} compact />
+                        )}
                     </div>
                     
                     {/* Кнопки справа */}
                     <div style={{display: 'flex', gap: '0.5rem', alignItems: 'center'}}>
                         {isMobile && (
                             <>
+                                {moduleFilter && onExitModule ? (
+                                    <button onClick={onExitModule} style={{...styles.logoutButton, padding: '0.4rem', fontSize: '1.1rem', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}} title="Выйти из модуля">
+                                        ← {moduleFilter}
+                                    </button>
+                                ) : onShowLearningPath && (
+                                    <button onClick={onShowLearningPath} style={{...styles.logoutButton, padding: '0.4rem', fontSize: '1.1rem', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}} title="Структурированное обучение">
+                                        🎓
+                                    </button>
+                                )}
                                 <button onClick={onShowStats} style={{...styles.logoutButton, padding: '0.4rem', fontSize: '1.1rem'}} title="Посмотреть статистику">
                                    📊
                                 </button>
@@ -520,6 +617,15 @@ const GameScreen: React.FC<GameScreenProps> = ({ user, onLogout, gameState, setG
                         )}
                         {!isMobile && (
                             <>
+                                {moduleFilter && onExitModule ? (
+                                    <button onClick={onExitModule} style={{...styles.logoutButton, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}}>
+                                        ← Выйти из модуля {moduleFilter}
+                                    </button>
+                                ) : onShowLearningPath && (
+                                    <button onClick={onShowLearningPath} style={{...styles.logoutButton, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}}>
+                                        🎓 Модули
+                                    </button>
+                                )}
                                 <button onClick={onShowStats} style={styles.logoutButton}>Статистика</button>
                                 <button onClick={onLogout} style={styles.logoutButton}>Выйти</button>
                             </>
@@ -564,13 +670,20 @@ const GameScreen: React.FC<GameScreenProps> = ({ user, onLogout, gameState, setG
                             
                             // Используем askedQuestionIds и фильтруем по текущему уровню
                             const askedIds = gameState.askedQuestionIds || [];
-                            const currentLevelQuestions = difficulty === 'all' 
+                            let currentLevelQuestions = difficulty === 'all' 
                                 ? QUESTION_DATABASE 
                                 : QUESTION_DATABASE.filter(q => q.seniority === difficulty);
                             
+                            // НОВОЕ: Если есть moduleFilter - фильтруем только вопросы этого модуля
+                            if (moduleFilter) {
+                                currentLevelQuestions = currentLevelQuestions.filter(q => 
+                                    q.modules && q.modules.includes(moduleFilter)
+                                );
+                            }
+                            
                             // Подсчитываем, сколько вопросов текущего уровня уже задано
                             const askedThisLevel = difficulty === 'all'
-                                ? askedIds.length  // Для "all" просто берем длину массива
+                                ? askedIds.filter(id => currentLevelQuestions.some(q => q.id === id)).length
                                 : askedIds.filter(id => 
                                     currentLevelQuestions.some(q => q.id === id)
                                   ).length;
@@ -593,7 +706,20 @@ const GameScreen: React.FC<GameScreenProps> = ({ user, onLogout, gameState, setG
                         <div style={{fontSize: isMobile ? '0.65rem' : '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px', textAlign: 'center'}}>
                                         {isMobile ? `${askedThisLevel} / ${remainingThisLevel}` : `Пройдено: ${askedThisLevel} | Осталось: ${remainingThisLevel}`}
                         </div>
-                                    <ProgressBar value={(askedThisLevel / totalThisLevel) * 100} />
+                                    <div style={{
+                                        width: '100%',
+                                        height: '6px',
+                                        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                        borderRadius: '3px',
+                                        overflow: 'hidden'
+                                    }}>
+                                        <div style={{
+                                            width: `${(askedThisLevel / totalThisLevel) * 100}%`,
+                                            height: '100%',
+                                            backgroundColor: 'var(--primary-color)',
+                                            transition: 'width 0.3s ease'
+                                        }} />
+                                    </div>
                                 </>
                             );
                         })()}
@@ -649,7 +775,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ user, onLogout, gameState, setG
                                 textAlign: isMobile ? 'left' : 'right'
                             }}>
                                 <span>Уровень: {currentQuestion.seniority.charAt(0).toUpperCase() + currentQuestion.seniority.slice(1)}</span>
-                                <span>Категория: {CATEGORIES_CONFIG[currentQuestion.categories[0] as Category].name}</span>
+                                <span>Категория: {CATEGORIES_CONFIG[getCategoriesFromModules(currentQuestion.modules)[0] as Category].name}</span>
                             </div>
                         </div>
                         <p 
@@ -687,7 +813,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ user, onLogout, gameState, setG
                                 flex: '1 1 auto',
                                 minHeight: 0,
                                 height: '100%',
-                                fontSize: isMobile ? '0.9rem' : '1rem',
+                                fontSize: isMobile ? '16px' : '1rem',
                                 padding: isMobile ? '0.75rem' : '1rem',
                                 resize: 'none'
                             }}
@@ -722,6 +848,25 @@ const GameScreen: React.FC<GameScreenProps> = ({ user, onLogout, gameState, setG
                                 {answer.length} / {HARD_MAX_LENGTH}
                             </div>
                         </div>
+                        
+                        {/* Кнопка пропуска вопроса */}
+                        {gameState.inventory && gameState.inventory.questionSkips > 0 && (
+                            <button
+                                onClick={handleSkipQuestion}
+                                style={{
+                                    ...styles.submitButton,
+                                    padding: isMobile ? '0.75rem' : '1rem',
+                                    fontSize: isMobile ? '0.95rem' : '1rem',
+                                    background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
+                                    opacity: isLoading ? 0.5 : 1
+                                }}
+                                disabled={isLoading}
+                                title={`Использовать пропуск (${gameState.inventory.questionSkips} доступно)`}
+                            >
+                                🎲 Пропустить вопрос ({gameState.inventory.questionSkips})
+                            </button>
+                        )}
+                        
                         <button 
                             onClick={evaluateAnswer} 
                             style={{ 
