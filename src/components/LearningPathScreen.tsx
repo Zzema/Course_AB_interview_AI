@@ -32,12 +32,21 @@ const LearningPathScreen: React.FC<LearningPathScreenProps> = ({
   useEffect(() => {
     // МАКСИМАЛЬНО агрессивный сброс скролла
     const forceScrollToTop = () => {
+      // Сначала пробуем скроллить к первому модулю
+      const firstModule = document.getElementById('first-module');
+      if (firstModule) {
+        firstModule.scrollIntoView({ behavior: 'instant', block: 'start' });
+        console.log('📍 Scrolled to first module using scrollIntoView');
+      }
+      
+      // Затем дополнительно сбрасываем весь скролл
       window.scrollTo({top: 0, left: 0, behavior: 'instant'});
       document.documentElement.scrollTop = 0;
       document.body.scrollTop = 0;
       if (document.scrollingElement) {
         document.scrollingElement.scrollTop = 0;
       }
+      console.log('📍 Force scroll to top executed');
     };
     
     // Немедленно
@@ -46,17 +55,19 @@ const LearningPathScreen: React.FC<LearningPathScreenProps> = ({
     // Через requestAnimationFrame (до следующего рендера)
     requestAnimationFrame(forceScrollToTop);
     
-    // Через короткие таймауты
+    // Через короткие таймауты для надежности
     const timer1 = setTimeout(forceScrollToTop, 0);
     const timer2 = setTimeout(forceScrollToTop, 10);
     const timer3 = setTimeout(forceScrollToTop, 50);
     const timer4 = setTimeout(forceScrollToTop, 100);
+    const timer5 = setTimeout(forceScrollToTop, 200);
     
     return () => {
       clearTimeout(timer1);
       clearTimeout(timer2);
       clearTimeout(timer3);
       clearTimeout(timer4);
+      clearTimeout(timer5);
     };
   }, []);
 
@@ -219,7 +230,15 @@ const LearningPathScreen: React.FC<LearningPathScreenProps> = ({
   };
 
   return (
-    <div style={{...styles.container, paddingTop: 0, position: 'relative', top: 0}}>
+    <div style={{
+      ...styles.container, 
+      paddingTop: 0, 
+      position: 'relative', 
+      top: 0,
+      minHeight: '100vh',
+      display: 'flex',
+      flexDirection: 'column'
+    }}>
       <div style={styles.header}>
         <button onClick={onBack} style={styles.backButton}>
           ← Назад к Free Practice
@@ -260,16 +279,18 @@ const LearningPathScreen: React.FC<LearningPathScreenProps> = ({
             </h2>
             
             <div style={styles.modulesGrid}>
-              {level.modules.map(module => {
+              {level.modules.map((module, moduleIndex) => {
                 const isUnlocked = isModuleUnlocked(learningProgress, module.id);
                 const progress = getModuleProgress(gameState, module.id);
                 const isComplete = isModuleCompleted(progress, module);
                 const statusIcon = getModuleStatusIcon(module.id);
                 const isHovered = hoveredModule === module.id;
+                const isFirstModule = module.id === '1.1';
 
                 return (
                   <div
                     key={module.id}
+                    id={isFirstModule ? 'first-module' : undefined}
                     style={{
                       ...styles.moduleCard,
                       ...(isComplete ? styles.moduleCardCompleted : {}),

@@ -717,7 +717,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ user, onLogout, gameState, setG
                             return (
                                 <>
                         <div style={{fontSize: isMobile ? '0.65rem' : '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px', textAlign: 'center'}}>
-                                        {isMobile ? `${askedThisLevel} / ${remainingThisLevel}` : `Пройдено: ${askedThisLevel} | Осталось: ${remainingThisLevel}`}
+                                        {isMobile ? `${askedThisLevel} / ${totalThisLevel}` : `Пройдено: ${askedThisLevel} из ${totalThisLevel}`}
                         </div>
                                     <div style={{
                                         width: '100%',
