@@ -25,14 +25,15 @@ const ActivitySeriesWidget: React.FC<ActivitySeriesWidgetProps> = ({ series, com
   const nextMilestone = getNextMilestone(series);
   const currentDate = getCurrentDateString();
   
-  // Генерируем данные для календаря последних 7 дней
+  // Генерируем данные для календаря последних 7 дней (слева направо, от старых к новым)
   const generateLast7Days = () => {
     const days = [];
     const today = new Date(currentDate + 'T00:00:00');
     
-    for (let i = 6; i >= 0; i--) {
+    // Изменено: теперь i идет от 0 до 6, чтобы огоньки показывались слева направо
+    for (let i = 0; i < 7; i++) {
       const date = new Date(today);
-      date.setDate(date.getDate() - i);
+      date.setDate(date.getDate() - (6 - i)); // 6-i: старые дни слева, новые справа
       const dateString = date.toISOString().split('T')[0];
       
       // Проверяем, был ли этот день в серии

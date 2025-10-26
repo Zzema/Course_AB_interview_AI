@@ -287,6 +287,10 @@ function App() {
                             gameState={session.gameState}
                             onSelectModule={(moduleId) => {
                                 setSelectedModuleId(moduleId);
+                                setView('game');
+                            }}
+                            onStartTheory={(moduleId) => {
+                                setSelectedModuleId(moduleId);
                                 setView('moduleDetail');
                             }}
                             onBack={() => setView('game')}
