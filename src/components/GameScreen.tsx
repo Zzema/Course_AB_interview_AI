@@ -68,6 +68,13 @@ const GameScreen: React.FC<GameScreenProps> = ({ user, onLogout, gameState, setG
             currentLevelQuestions = QUESTION_DATABASE.filter(q => 
                 q.modules && q.modules.includes(moduleFilter)
             );
+            console.log('🔍 Module Filter Debug:', {
+                moduleFilter,
+                totalQuestions: QUESTION_DATABASE.length,
+                filteredQuestions: currentLevelQuestions.length,
+                questionIds: currentLevelQuestions.map(q => q.id),
+                expectedIds: [1, 41, 91, 111, 112, 113]
+            });
         } else {
             // Обычный режим - фильтруем по уровню сложности
             currentLevelQuestions = difficulty === 'all' 

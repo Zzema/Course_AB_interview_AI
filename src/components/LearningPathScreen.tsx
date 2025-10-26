@@ -30,19 +30,34 @@ const LearningPathScreen: React.FC<LearningPathScreenProps> = ({
 
   // Скроллим к началу при монтировании компонента
   useEffect(() => {
-    // Принудительно скроллим к началу несколькими способами
-    window.scrollTo(0, 0);
-    document.documentElement.scrollTop = 0;
-    document.body.scrollTop = 0;
-    
-    // Также делаем это с небольшой задержкой для надежности
-    const timer = setTimeout(() => {
-      window.scrollTo(0, 0);
+    // МАКСИМАЛЬНО агрессивный сброс скролла
+    const forceScrollToTop = () => {
+      window.scrollTo({top: 0, left: 0, behavior: 'instant'});
       document.documentElement.scrollTop = 0;
       document.body.scrollTop = 0;
-    }, 10);
+      if (document.scrollingElement) {
+        document.scrollingElement.scrollTop = 0;
+      }
+    };
     
-    return () => clearTimeout(timer);
+    // Немедленно
+    forceScrollToTop();
+    
+    // Через requestAnimationFrame (до следующего рендера)
+    requestAnimationFrame(forceScrollToTop);
+    
+    // Через короткие таймауты
+    const timer1 = setTimeout(forceScrollToTop, 0);
+    const timer2 = setTimeout(forceScrollToTop, 10);
+    const timer3 = setTimeout(forceScrollToTop, 50);
+    const timer4 = setTimeout(forceScrollToTop, 100);
+    
+    return () => {
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+      clearTimeout(timer3);
+      clearTimeout(timer4);
+    };
   }, []);
 
   const styles = {
