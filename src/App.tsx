@@ -66,45 +66,16 @@ function App() {
                 if (!existingState.selectedDifficulty) {
                     existingState.selectedDifficulty = 'junior';
                 }
-                // Migrate old data: add askedQuestionIds if it doesn't exist
-                if (!existingState.askedQuestionIds) {
-                    existingState.askedQuestionIds = [];
-                }
-                // Migrate old data: add levelProgress if it doesn't exist
+                // Ensure levelProgress exists (simplified migration)
                 if (!existingState.levelProgress) {
-                    console.log('🔄 Migrating: Creating levelProgress');
+                    console.log('🔄 Initializing levelProgress');
                     const { QUESTION_DATABASE } = await import('./data/constants');
                     existingState.levelProgress = {
-                        junior: {
-                            askedQuestionIds: existingState.askedQuestionIds?.filter(id => 
-                                QUESTION_DATABASE.find(q => q.id === id)?.seniority === 'junior'
-                            ) || [],
-                            totalQuestions: QUESTION_DATABASE.filter(q => q.seniority === 'junior').length,
-                            averageScore: 0
-                        },
-                        mid: {
-                            askedQuestionIds: existingState.askedQuestionIds?.filter(id => 
-                                QUESTION_DATABASE.find(q => q.id === id)?.seniority === 'mid'
-                            ) || [],
-                            totalQuestions: QUESTION_DATABASE.filter(q => q.seniority === 'mid').length,
-                            averageScore: 0
-                        },
-                        senior: {
-                            askedQuestionIds: existingState.askedQuestionIds?.filter(id => 
-                                QUESTION_DATABASE.find(q => q.id === id)?.seniority === 'senior'
-                            ) || [],
-                            totalQuestions: QUESTION_DATABASE.filter(q => q.seniority === 'senior').length,
-                            averageScore: 0
-                        },
-                        staff: {
-                            askedQuestionIds: existingState.askedQuestionIds?.filter(id => 
-                                QUESTION_DATABASE.find(q => q.id === id)?.seniority === 'staff'
-                            ) || [],
-                            totalQuestions: QUESTION_DATABASE.filter(q => q.seniority === 'staff').length,
-                            averageScore: 0
-                        }
+                        junior: { askedQuestionIds: [], totalQuestions: QUESTION_DATABASE.filter(q => q.seniority === 'junior').length, averageScore: 0 },
+                        mid: { askedQuestionIds: [], totalQuestions: QUESTION_DATABASE.filter(q => q.seniority === 'mid').length, averageScore: 0 },
+                        senior: { askedQuestionIds: [], totalQuestions: QUESTION_DATABASE.filter(q => q.seniority === 'senior').length, averageScore: 0 },
+                        staff: { askedQuestionIds: [], totalQuestions: QUESTION_DATABASE.filter(q => q.seniority === 'staff').length, averageScore: 0 }
                     };
-                    console.log('✅ Migration complete:', existingState.levelProgress);
                 } else {
                     console.log('✅ levelProgress already exists:', existingState.levelProgress);
                 }

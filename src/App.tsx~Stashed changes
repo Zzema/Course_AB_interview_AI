@@ -1,0 +1,152 @@
+import React, { useEffect } from 'react';
+import { AppProvider, useApp } from './contexts/AppContext';
+import { TelegramProvider } from './contexts/TelegramContext';
+import UserSetup from './components/UserSetup';
+import ProgressSummary from './components/ProgressSummary';
+import GameScreen from './components/game/GameScreen';
+import StatisticsScreen from './components/statistics/StatisticsScreenGamified';
+import LearningPathScreen from './components/learning/LearningPathScreen';
+import ModuleDetailScreen from './components/learning/ModuleDetailScreen';
+import { testFirebaseConnection, testFirebaseAuth, testFirebaseAPI } from './config/firebase';
+
+// Define google on the window object for TypeScript
+declare global {
+    interface Window {
+        google: any;
+    }
+}
+
+const AppContent: React.FC = () => {
+    const { view, session, isStarting, selectedModuleId, navigate, login, logout, gameState, updateGameState } = useApp();
+
+    // Test Firebase connection on mount
+    useEffect(() => {
+        const testFirebase = async () => {
+            console.log('🚀 Starting Firebase diagnostics...');
+
+            // Test API connectivity first
+            const apiOk = await testFirebaseAPI();
+            console.log('🔍 API connectivity:', apiOk ? '✅ OK' : '❌ Failed');
+
+            // Test Firestore
+            const firestoreOk = await testFirebaseConnection();
+            console.log('🔍 Firestore:', firestoreOk ? '✅ OK' : '❌ Failed');
+
+            // Test Auth
+            const authOk = await testFirebaseAuth();
+            console.log('🔍 Authentication:', authOk ? '✅ OK' : '❌ Failed');
+
+            if (apiOk && firestoreOk && authOk) {
+                console.log('🎉 Firebase is fully operational!');
+            } else {
+                console.warn('⚠️ Firebase has issues. Check configuration.');
+                console.warn('💡 Common solutions:');
+                console.warn('   1. Verify project "course-ab-interview" exists in Firebase Console');
+                console.warn('   2. Enable Authentication > Google Sign-in');
+                console.warn('   3. Check that you have access to this Firebase project');
+                console.warn('   4. Verify API keys are correct');
+            }
+        };
+
+        // Small delay to let Firebase initialize
+        setTimeout(testFirebase, 1000);
+    }, []);
+
+    const handleReset = () => {
+        if (session) {
+            const { createInitialGameState } = require('./lib/api');
+            const { getUserFullName } = require('./utils/userUtils');
+            const fullName = getUserFullName(session.user);
+            const newGameState = createInitialGameState(fullName);
+            updateGameState(() => newGameState);
+            navigate.toGame();
+        }
+    };
+
+    const renderContent = () => {
+        if (isStarting && !session) {
+             return <UserSetup onStart={()=>{}} isStarting={true} />;
+        }
+
+        switch (view) {
+            case 'login':
+                return <UserSetup onStart={login} isStarting={isStarting} />;
+                
+            case 'summary':
+                if (!session) return null;
+                return <ProgressSummary 
+                            user={session.user} 
+                            gameState={session.gameState} 
+                            onContinue={navigate.toGame}
+                            onReset={handleReset}
+                            onShowStats={navigate.toStats}
+                        />;
+                        
+            case 'game':
+                if (!session) return null;
+                return <GameScreen 
+                            user={session.user} 
+                            onLogout={logout} 
+                            gameState={session.gameState}
+                            setGameState={(gs) => updateGameState(gs)}
+                            onShowStats={navigate.toStats}
+                            onShowLearningPath={navigate.toLearningPath}
+                       />;
+                       
+            case 'moduleGame':
+                if (!session || !selectedModuleId) return null;
+                return <GameScreen 
+                            user={session.user} 
+                            onLogout={logout} 
+                            gameState={session.gameState}
+                            setGameState={(gs) => updateGameState(gs)}
+                            onShowStats={navigate.toStats}
+                            moduleFilter={selectedModuleId}
+                            onExitModule={() => navigate.toModuleDetail(selectedModuleId)}
+                       />;
+                       
+            case 'stats':
+                 if (!session) return null;
+                 return <StatisticsScreen
+                            user={session.user}
+                            gameState={session.gameState}
+                            onBack={navigate.back}
+                        />
+                        
+            case 'learningPath':
+                if (!session) return null;
+                return <LearningPathScreen
+                            gameState={session.gameState}
+                            onSelectModule={navigate.toModuleGame}
+                            onStartTheory={navigate.toModuleDetail}
+                            onBack={navigate.toGame}
+                        />
+                        
+            case 'moduleDetail':
+                if (!session || !selectedModuleId) return null;
+                return <ModuleDetailScreen
+                            gameState={session.gameState}
+                            moduleId={selectedModuleId}
+                            onBack={navigate.toLearningPath}
+                            onStartQuestions={navigate.toModuleGame}
+                        />
+                        
+            default:
+                return null;
+        }
+    };
+
+    return renderContent();
+};
+
+function App() {
+    return (
+        <TelegramProvider>
+            <AppProvider>
+                <AppContent />
+            </AppProvider>
+        </TelegramProvider>
+    );
+}
+
+export default App;

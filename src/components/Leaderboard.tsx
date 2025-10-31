@@ -96,7 +96,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({
             score: currentRating,
             isCurrentUser: true,
             ratingHistory: currentRatingHistory,
-            difficulty: selectedDifficulty === 'all' ? 'mid' : selectedDifficulty,
+            difficulty: (selectedDifficulty === 'all' ? 'mid' : selectedDifficulty) as 'junior' | 'mid' | 'senior' | 'staff',
             email: currentUser.email
         };
 
