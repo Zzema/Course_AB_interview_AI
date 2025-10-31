@@ -43,6 +43,17 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
     const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
     const isAiStudio = !!window.aistudio;
     const isTelegramBrowser = navigator.userAgent.includes('Telegram') || window.location.hostname.includes('t.me');
+
+    // Логируем определение браузера
+    useEffect(() => {
+        console.log('🌐 Browser detection:', {
+            userAgent: navigator.userAgent,
+            hostname: window.location.hostname,
+            isTelegramBrowser,
+            isAiStudio: !!window.aistudio,
+            isStarting
+        });
+    }, []);
     
     // Отслеживание размера экрана
     useEffect(() => {
@@ -73,19 +84,40 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
 
     // Обработка redirect callback для Telegram браузера
     useEffect(() => {
-        if (isTelegramBrowser && window.location.hash.includes('access_token') || window.location.search.includes('code')) {
-            console.log('🔵 Detected OAuth redirect callback in Telegram browser');
+        const hasAuthParams = window.location.hash.includes('access_token') ||
+                             window.location.search.includes('code') ||
+                             window.location.search.includes('error');
+
+        if (isTelegramBrowser && hasAuthParams) {
+            console.log('🔵 Detected OAuth redirect callback in Telegram browser', {
+                location: window.location.href,
+                search: window.location.search,
+                hash: window.location.hash,
+                userAgent: navigator.userAgent
+            });
+
             // Google может вернуть токен в URL, попробуем обработать его
             const urlParams = new URLSearchParams(window.location.search);
             const hashParams = new URLSearchParams(window.location.hash.substring(1));
 
-            // Если есть код авторизации, попробуем обменять его на токен
             const code = urlParams.get('code') || hashParams.get('code');
-            if (code) {
-                console.log('🔵 Found authorization code, processing...');
-                // Здесь можно добавить логику обмена кода на токен через backend
-                // Пока просто показываем ошибку, что нужно использовать popup режим
-                setAuthError("Для авторизации в Telegram используйте обычный браузер или попробуйте еще раз.");
+            const error = urlParams.get('error') || hashParams.get('error');
+            const accessToken = hashParams.get('access_token');
+
+            if (error) {
+                console.error('❌ OAuth error in redirect:', error, {
+                    urlParams: Object.fromEntries(urlParams),
+                    hashParams: Object.fromEntries(hashParams)
+                });
+                setAuthError(`Ошибка авторизации: ${error}. Попробуйте еще раз.`);
+            } else if (accessToken) {
+                console.log('🔵 Found access token in hash, this should not happen with redirect mode');
+                setAuthError("Неожиданный формат ответа. Попробуйте еще раз.");
+            } else if (code) {
+                console.log('🔵 Found authorization code, processing...', { code: code.substring(0, 20) + '...' });
+                // В redirect режиме с кодом нужно обменять код на токен через backend
+                // Пока показываем ошибку с предложением использовать popup режим
+                setAuthError("Авторизация в Telegram браузере не поддерживается. Откройте приложение в обычном браузере.");
             }
         }
     }, [isTelegramBrowser]);
@@ -95,8 +127,16 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
         console.log('🔵 Google Sign-In callback received:', response);
 
         if (!response.credential) {
-            console.error("Google Sign-In failed: No credential returned.");
-            setAuthError("Произошла ошибка при входе через Google. Попробуйте еще раз.");
+            console.error("❌ Google Sign-In failed: No credential returned.", {
+                response,
+                isTelegramBrowser,
+                userAgent: navigator.userAgent,
+                location: window.location.href
+            });
+            const errorMsg = isTelegramBrowser
+                ? "Ошибка авторизации в Telegram браузере. Попробуйте открыть в обычном браузере или обновить страницу."
+                : "Произошла ошибка при входе через Google. Попробуйте еще раз.";
+            setAuthError(errorMsg);
             return;
         }
         
@@ -125,12 +165,26 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
                     setTempUser(user);
                 }
             } else {
-                 console.error("Failed to parse user from Google credential.");
-                 setAuthError("Не удалось получить данные пользователя из ответа Google.");
+                 console.error("❌ Failed to parse user from Google credential.", {
+                     userObject,
+                     response,
+                     isTelegramBrowser
+                 });
+                 const errorMsg = isTelegramBrowser
+                     ? "Не удалось получить данные пользователя в Telegram браузере. Попробуйте другой браузер."
+                     : "Не удалось получить данные пользователя из ответа Google.";
+                 setAuthError(errorMsg);
             }
         } catch (error) {
-            console.error("Error processing Google credential:", error);
-            setAuthError("Произошла ошибка при обработке данных пользователя.");
+            console.error("❌ Error processing Google credential:", error, {
+                response,
+                isTelegramBrowser,
+                userAgent: navigator.userAgent
+            });
+            const errorMsg = isTelegramBrowser
+                ? "Ошибка обработки данных в Telegram браузере. Попробуйте обычный браузер."
+                : "Произошла ошибка при обработке данных пользователя.";
+            setAuthError(errorMsg);
         }
     }, [onStart]);
 
@@ -138,10 +192,22 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
         if (isAiStudio || isStarting || tempUser || (isTelegramBrowser && authError)) return; // Не инициализируем если уже авторизованы или есть ошибка в Telegram
 
         const initializeGsi = () => {
+            console.log('🚀 Initializing Google Sign-In', {
+                hasGoogle: !!window.google,
+                hasButtonRef: !!googleButtonRef.current,
+                tempUser: !!tempUser,
+                isTelegramBrowser,
+                userAgent: navigator.userAgent
+            });
+
             if (window.google && googleButtonRef.current && !tempUser) {
-                if (googleButtonRef.current.childElementCount > 0) return;
+                if (googleButtonRef.current.childElementCount > 0) {
+                    console.log('⚠️ Google button already rendered, skipping');
+                    return;
+                }
 
                 if (!GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID.startsWith("ВАШ")) {
+                    console.error('❌ Google Client ID not configured');
                     setAuthError("Ошибка конфигурации: Google Client ID не найден. Откройте файл 'config.ts' и вставьте ваш ключ.");
                     return;
                 }
@@ -165,12 +231,21 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
                 if (isTelegramBrowser) {
                     config.ux_mode = 'redirect';
                     config.redirect_uri = window.location.origin;
-                    console.log('🔵 Using redirect mode for Telegram browser');
+                    console.log('🔵 Using redirect mode for Telegram browser', {
+                        config,
+                        userAgent: navigator.userAgent,
+                        location: window.location.href
+                    });
 
                     // Добавляем timeout для Telegram браузера
                     authTimeout = setTimeout(() => {
-                        console.log('🔵 Telegram auth timeout, showing error');
-                        setAuthError("Вход был отменен или истекло время ожидания. Попробуйте еще раз.");
+                        console.log('⏰ Telegram auth timeout after 30s', {
+                            isTelegramBrowser,
+                            userAgent: navigator.userAgent,
+                            location: window.location.href
+                        });
+                        const timeoutMsg = "Вход был отменен или истекло время ожидания (30 сек). Попробуйте еще раз.";
+                        setAuthError(timeoutMsg);
                         // Очищаем Google кнопку при таймауте
                         if (googleButtonRef.current) {
                             googleButtonRef.current.innerHTML = '';
@@ -179,11 +254,14 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
                     }, 30000); // 30 секунд
                 }
 
+                console.log('🔧 Initializing Google with config:', config);
                 window.google.accounts.id.initialize(config);
 
                 // Добавляем обработку ошибок
                 window.google.accounts.id.disableAutoSelect();
+                console.log('✅ Google Sign-In initialized successfully');
 
+                console.log('🎨 Rendering Google button...');
                 window.google.accounts.id.renderButton(
                     googleButtonRef.current,
                     {
@@ -196,18 +274,22 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
                         width: '280'
                     }
                 );
+                console.log('✅ Google button rendered');
             }
         }
 
         if (!window.google) {
+            console.log('⏳ Waiting for Google SDK to load...');
             const interval = setInterval(() => {
                 if (window.google) {
+                    console.log('✅ Google SDK loaded, initializing...');
                     clearInterval(interval);
                     initializeGsi();
                 }
             }, 100);
             return () => clearInterval(interval);
         } else {
+            console.log('✅ Google SDK already loaded');
             initializeGsi();
         }
     }, [isStarting, handleCredentialResponse, isAiStudio, tempUser]);
@@ -249,10 +331,33 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
         }
 
         if (authError) {
+            const debugInfo = isTelegramBrowser ? `
+Browser: ${navigator.userAgent}
+Location: ${window.location.href}
+Telegram: ${isTelegramBrowser}
+Time: ${new Date().toISOString()}
+            `.trim() : null;
+
             return (
                 <div style={{color: 'var(--error-color)', textAlign: 'center', padding: '1rem', backgroundColor: 'rgba(255, 82, 82, 0.1)', borderRadius: '8px', border: '1px solid var(--error-color)'}}>
-                    <p style={{fontWeight: 'bold', marginBottom: '0.5rem'}}>Ошибка</p>
-                    <p style={{fontSize: '0.9rem'}}>{authError}</p>
+                    <p style={{fontWeight: 'bold', marginBottom: '0.5rem'}}>Ошибка авторизации</p>
+                    <p style={{fontSize: '0.9rem', marginBottom: '0.5rem'}}>{authError}</p>
+                    {debugInfo && (
+                        <details style={{fontSize: '0.7rem', textAlign: 'left', marginTop: '0.5rem'}}>
+                            <summary style={{cursor: 'pointer', fontWeight: 'bold'}}>📋 Техническая информация</summary>
+                            <pre style={{
+                                backgroundColor: 'rgba(0,0,0,0.1)',
+                                padding: '0.5rem',
+                                borderRadius: '4px',
+                                marginTop: '0.25rem',
+                                whiteSpace: 'pre-wrap',
+                                fontSize: '0.6rem',
+                                overflow: 'auto'
+                            }}>
+                                {debugInfo}
+                            </pre>
+                        </details>
+                    )}
                 </div>
             );
         }
