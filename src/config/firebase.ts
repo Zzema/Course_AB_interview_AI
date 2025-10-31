@@ -4,9 +4,9 @@ import { getFirestore } from 'firebase/firestore';
 // Firebase configuration
 const firebaseConfig = {
     apiKey: "AIzaSyBk20x0NWvcLvSChKp0mhiWOchDDrEuJ5c",
-    authDomain: "course-ab-interview.firebaseapp.com",
-    projectId: "251933681601",
-    storageBucket: "course-ab-interview.firebasestorage.app",
+    authDomain: "course-ab-interview.web.app",
+    projectId: "course-ab-interview",
+    storageBucket: "course-ab-interview.appspot.com",
     messagingSenderId: "251933681601",
     appId: "1:251933681601:web:47bf36492a4c337274b140"
 };
