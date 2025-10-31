@@ -42,6 +42,7 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
     const [selectedLevel, setSelectedLevel] = useState<'junior' | 'mid' | 'senior' | 'staff'>('junior');
     const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
     const isAiStudio = !!window.aistudio;
+    const isTelegramBrowser = navigator.userAgent.includes('Telegram') || window.location.hostname.includes('t.me');
     
     // Отслеживание размера экрана
     useEffect(() => {
@@ -70,8 +71,29 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
         }
     }, [tempUser]);
 
+    // Обработка redirect callback для Telegram браузера
+    useEffect(() => {
+        if (isTelegramBrowser && window.location.hash.includes('access_token') || window.location.search.includes('code')) {
+            console.log('🔵 Detected OAuth redirect callback in Telegram browser');
+            // Google может вернуть токен в URL, попробуем обработать его
+            const urlParams = new URLSearchParams(window.location.search);
+            const hashParams = new URLSearchParams(window.location.hash.substring(1));
+
+            // Если есть код авторизации, попробуем обменять его на токен
+            const code = urlParams.get('code') || hashParams.get('code');
+            if (code) {
+                console.log('🔵 Found authorization code, processing...');
+                // Здесь можно добавить логику обмена кода на токен через backend
+                // Пока просто показываем ошибку, что нужно использовать popup режим
+                setAuthError("Для авторизации в Telegram используйте обычный браузер или попробуйте еще раз.");
+            }
+        }
+    }, [isTelegramBrowser]);
+
     // --- Standard Google Sign-In Logic ---
     const handleCredentialResponse = useCallback(async (response: any) => {
+        console.log('🔵 Google Sign-In callback received:', response);
+
         if (!response.credential) {
             console.error("Google Sign-In failed: No credential returned.");
             setAuthError("Произошла ошибка при входе через Google. Попробуйте еще раз.");
@@ -113,7 +135,7 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
     }, [onStart]);
 
     useEffect(() => {
-        if (isAiStudio || isStarting || tempUser) return; // Не инициализируем если уже авторизованы
+        if (isAiStudio || isStarting || tempUser || (isTelegramBrowser && authError)) return; // Не инициализируем если уже авторизованы или есть ошибка в Telegram
 
         const initializeGsi = () => {
             if (window.google && googleButtonRef.current && !tempUser) {
@@ -124,15 +146,56 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
                     return;
                 }
 
-                window.google.accounts.id.initialize({
+                let authTimeout: NodeJS.Timeout | null = null;
+
+                const wrappedCallback = (response: any) => {
+                    if (authTimeout) {
+                        clearTimeout(authTimeout);
+                        authTimeout = null;
+                    }
+                    handleCredentialResponse(response);
+                };
+
+                const config: any = {
                     client_id: GOOGLE_CLIENT_ID,
-                    callback: handleCredentialResponse
-                });
+                    callback: wrappedCallback
+                };
+
+                // Для Telegram браузера отключаем popup режим и используем redirect
+                if (isTelegramBrowser) {
+                    config.ux_mode = 'redirect';
+                    config.redirect_uri = window.location.origin;
+                    console.log('🔵 Using redirect mode for Telegram browser');
+
+                    // Добавляем timeout для Telegram браузера
+                    authTimeout = setTimeout(() => {
+                        console.log('🔵 Telegram auth timeout, showing error');
+                        setAuthError("Вход был отменен или истекло время ожидания. Попробуйте еще раз.");
+                        // Очищаем Google кнопку при таймауте
+                        if (googleButtonRef.current) {
+                            googleButtonRef.current.innerHTML = '';
+                            googleButtonRef.current.style.display = 'none';
+                        }
+                    }, 30000); // 30 секунд
+                }
+
+                window.google.accounts.id.initialize(config);
+
+                // Добавляем обработку ошибок
+                window.google.accounts.id.disableAutoSelect();
+
                 window.google.accounts.id.renderButton(
                     googleButtonRef.current,
-                    { theme: "filled_black", size: "large", type: 'standard', text: 'signin_with', shape: 'rectangular', logo_alignment: 'left', width: '280' }
+                    {
+                        theme: "filled_black",
+                        size: "large",
+                        type: 'standard',
+                        text: 'signin_with',
+                        shape: 'rectangular',
+                        logo_alignment: 'left',
+                        width: '280'
+                    }
                 );
-                // window.google.accounts.id.prompt(); // One Tap prompt can be annoying for local dev
             }
         }
 
@@ -325,7 +388,10 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
         return (
             <div style={{width: '100%', display: 'flex', flexDirection: 'column', gap: '1.5rem', alignItems: 'center'}}>
                  <p style={{textAlign: 'center', color: 'var(--text-secondary)'}}>
-                    Войдите с помощью Google, чтобы начать. Ваш прогресс будет сохранен.
+                    {isTelegramBrowser
+                        ? "В Telegram браузере авторизация может работать нестабильно. Рекомендуем открыть в обычном браузере."
+                        : "Войдите с помощью Google, чтобы начать. Ваш прогресс будет сохранен."
+                    }
                 </p>
                 <div 
                     ref={googleButtonRef} 
