@@ -52,15 +52,13 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
     
-    // Очистка Google кнопки при авторизации
+        // Очистка Google кнопки при авторизации
     useEffect(() => {
-        if (tempUser) {
+        if (tempUser && googleButtonRef.current) {
             // Полностью очищаем Google кнопку и iframe
-            if (googleButtonRef.current) {
-                googleButtonRef.current.innerHTML = '';
-                googleButtonRef.current.style.display = 'none';
-            }
-            
+            googleButtonRef.current.innerHTML = '';
+            googleButtonRef.current.style.display = 'none';
+
             // Также отключаем Google SDK
             if (window.google && window.google.accounts && window.google.accounts.id) {
                 try {
@@ -118,9 +116,9 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
         if (isAiStudio || isStarting || tempUser) return; // Не инициализируем если уже авторизованы
 
         const initializeGsi = () => {
-            if (window.google && googleButtonRef.current) {
+            if (window.google && googleButtonRef.current && !tempUser) {
                 if (googleButtonRef.current.childElementCount > 0) return;
-                
+
                 if (!GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID.startsWith("ВАШ")) {
                     setAuthError("Ошибка конфигурации: Google Client ID не найден. Откройте файл 'config.ts' и вставьте ваш ключ.");
                     return;
@@ -322,11 +320,6 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
                     </button>
                 </div>
             )
-        }
-
-        // Если пользователь уже авторизован, не показываем Google кнопку вообще
-        if (tempUser) {
-            return null; // Ничего не рендерим, т.к. уже показан экран выбора уровня выше
         }
 
         return (
