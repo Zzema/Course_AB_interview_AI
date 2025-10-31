@@ -42,7 +42,10 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
     const [selectedLevel, setSelectedLevel] = useState<'junior' | 'mid' | 'senior' | 'staff'>('junior');
     const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
     const isAiStudio = !!window.aistudio;
-    const isTelegramBrowser = navigator.userAgent.includes('Telegram') || window.location.hostname.includes('t.me');
+    // Определяем разные типы Telegram окружений
+    const isTelegramMobileApp = navigator.userAgent.includes('Telegram') && !window.location.hostname.includes('web.telegram.org');
+    const isTelegramWeb = window.location.hostname.includes('web.telegram.org') || window.location.hostname.includes('t.me');
+    const isTelegramBrowser = isTelegramMobileApp; // Только мобильное приложение использует redirect
 
     // Система логирования для отладки
     const addLog = (message: string, data?: any) => {
@@ -73,6 +76,10 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
     useEffect(() => {
         addLog('🌐 Browser detection:', {
             hostname: window.location.hostname,
+            userAgent: navigator.userAgent.substring(0, 100) + '...',
+            isTelegramMobileApp,
+            isTelegramWeb,
+            isTelegramBrowser,
             isAiStudio: !!window.aistudio,
             isStarting
         });
@@ -105,13 +112,13 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
         }
     }, [tempUser]);
 
-    // Обработка redirect callback для Telegram браузера
+    // Обработка redirect callback для мобильного приложения Telegram
     useEffect(() => {
         const hasAuthParams = window.location.hash.includes('access_token') ||
                              window.location.search.includes('code') ||
                              window.location.search.includes('error');
 
-        if (isTelegramBrowser && hasAuthParams) {
+        if (isTelegramMobileApp && hasAuthParams) {
             addLog('🔵 Detected OAuth redirect callback in Telegram browser', {
                 search: window.location.search,
                 hash: window.location.hash
@@ -135,10 +142,10 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
                 addLog('🔵 Found authorization code, processing...', { code: code.substring(0, 20) + '...' });
                 // В redirect режиме с кодом нужно обменять код на токен через backend
                 // Пока показываем ошибку с предложением использовать popup режим
-                setAuthError("Авторизация в Telegram браузере не поддерживается. Откройте приложение в обычном браузере.");
+                setAuthError("Авторизация в мобильном приложении Telegram не поддерживается. Откройте в обычном браузере.");
             }
         }
-    }, [isTelegramBrowser]);
+    }, [isTelegramMobileApp]);
 
     // --- Standard Google Sign-In Logic ---
     const handleCredentialResponse = useCallback(async (response: any) => {
@@ -147,8 +154,10 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
 
             if (!response.credential) {
                 addLog("❌ Google Sign-In failed: No credential returned.", { response });
-                const errorMsg = isTelegramBrowser
-                    ? "Ошибка авторизации в Telegram браузере. Попробуйте открыть в обычном браузере или обновить страницу."
+                const errorMsg = isTelegramMobileApp
+                    ? "Ошибка авторизации в мобильном приложении Telegram. Попробуйте открыть в обычном браузере."
+                    : isTelegramWeb
+                    ? "Ошибка авторизации в Telegram Web. Попробуйте обновить страницу или другой браузер."
                     : "Произошла ошибка при входе через Google. Попробуйте еще раз.";
                 setAuthError(errorMsg);
                 return;
@@ -185,22 +194,26 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
                 }
             } else {
                  addLog("❌ Failed to parse user from Google credential.", { userObject });
-                 const errorMsg = isTelegramBrowser
-                     ? "Не удалось получить данные пользователя в Telegram браузере. Попробуйте другой браузер."
+                 const errorMsg = isTelegramMobileApp
+                     ? "Не удалось получить данные пользователя в мобильном Telegram. Попробуйте обычный браузер."
+                     : isTelegramWeb
+                     ? "Не удалось получить данные пользователя в Telegram Web. Попробуйте обновить страницу."
                      : "Не удалось получить данные пользователя из ответа Google.";
                  setAuthError(errorMsg);
             }
         } catch (error) {
             addLog("❌ Error processing Google credential:", { error: error?.toString() });
-            const errorMsg = isTelegramBrowser
-                ? "Ошибка обработки данных в Telegram браузере. Попробуйте обычный браузер."
+            const errorMsg = isTelegramMobileApp
+                ? "Ошибка обработки данных в мобильном Telegram. Попробуйте обычный браузер."
+                : isTelegramWeb
+                ? "Ошибка обработки данных в Telegram Web. Попробуйте обновить страницу."
                 : "Произошла ошибка при обработке данных пользователя.";
             setAuthError(errorMsg);
         }
     }, [onStart]);
 
     useEffect(() => {
-        if (isAiStudio || isStarting || tempUser || (isTelegramBrowser && authError)) return; // Не инициализируем если уже авторизованы или есть ошибка в Telegram
+        if (isAiStudio || isStarting || tempUser || (isTelegramMobileApp && authError)) return; // Не инициализируем если уже авторизованы или есть ошибка в мобильном Telegram
 
         const initializeGsi = () => {
             addLog('🚀 Initializing Google Sign-In', {
@@ -236,15 +249,16 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
                     callback: wrappedCallback
                 };
 
-                // Для Telegram браузера отключаем popup режим и используем redirect
-                if (isTelegramBrowser) {
+                // Специальные настройки для разных Telegram окружений
+                if (isTelegramMobileApp) {
+                    // Для мобильного приложения Telegram используем redirect режим
                     config.ux_mode = 'redirect';
                     config.redirect_uri = window.location.origin;
-                    addLog('🔵 Using redirect mode for Telegram browser', { config });
+                    addLog('🔵 Using redirect mode for Telegram mobile app', { config });
 
-                    // Добавляем timeout для Telegram браузера
+                    // Добавляем timeout для мобильного приложения
                     authTimeout = setTimeout(() => {
-                        addLog('⏰ Telegram auth timeout after 30s');
+                        addLog('⏰ Telegram mobile auth timeout after 30s');
                         const timeoutMsg = "Вход был отменен или истекло время ожидания (30 сек). Попробуйте еще раз.";
                         setAuthError(timeoutMsg);
                         // Очищаем Google кнопку при таймауте
@@ -253,6 +267,12 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
                             googleButtonRef.current.style.display = 'none';
                         }
                     }, 30000); // 30 секунд
+                } else if (isTelegramWeb) {
+                    // Для веб версии Telegram используем popup режим, но отключаем авто-выбор
+                    addLog('🔵 Using popup mode for Telegram Web', { config });
+                } else {
+                    // Обычный браузер - popup режим по умолчанию
+                    addLog('🔵 Using default popup mode for regular browser');
                 }
 
                 addLog('🔧 Initializing Google with config:', config);
@@ -554,8 +574,10 @@ Logs: ${debugLogs.length} entries
         return (
             <div style={{width: '100%', display: 'flex', flexDirection: 'column', gap: '1.5rem', alignItems: 'center'}}>
                  <p style={{textAlign: 'center', color: 'var(--text-secondary)'}}>
-                    {isTelegramBrowser
-                        ? "В Telegram браузере авторизация может работать нестабильно. Рекомендуем открыть в обычном браузере."
+                    {isTelegramMobileApp
+                        ? "В мобильном приложении Telegram авторизация ограничена. Рекомендуем открыть в обычном браузере."
+                        : isTelegramWeb
+                        ? "Вы в Telegram Web - авторизация должна работать нормально."
                         : "Войдите с помощью Google, чтобы начать. Ваш прогресс будет сохранен."
                     }
                 </p>
