@@ -44,12 +44,36 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
     const isAiStudio = !!window.aistudio;
     const isTelegramBrowser = navigator.userAgent.includes('Telegram') || window.location.hostname.includes('t.me');
 
+    // Система логирования для отладки
+    const addLog = (message: string, data?: any) => {
+        const logEntry = {
+            timestamp: new Date().toISOString(),
+            message,
+            data,
+            userAgent: navigator.userAgent,
+            location: window.location.href,
+            isTelegramBrowser
+        };
+
+        // Логируем в консоль
+        console.log(message, data || '');
+
+        // Сохраняем в localStorage для Telegram браузера
+        try {
+            const logs = JSON.parse(localStorage.getItem('auth-debug-logs') || '[]');
+            logs.push(logEntry);
+            // Оставляем только последние 20 логов
+            if (logs.length > 20) logs.shift();
+            localStorage.setItem('auth-debug-logs', JSON.stringify(logs));
+        } catch (e) {
+            console.error('Failed to save log to localStorage:', e);
+        }
+    };
+
     // Логируем определение браузера
     useEffect(() => {
-        console.log('🌐 Browser detection:', {
-            userAgent: navigator.userAgent,
+        addLog('🌐 Browser detection:', {
             hostname: window.location.hostname,
-            isTelegramBrowser,
             isAiStudio: !!window.aistudio,
             isStarting
         });
@@ -89,11 +113,9 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
                              window.location.search.includes('error');
 
         if (isTelegramBrowser && hasAuthParams) {
-            console.log('🔵 Detected OAuth redirect callback in Telegram browser', {
-                location: window.location.href,
+            addLog('🔵 Detected OAuth redirect callback in Telegram browser', {
                 search: window.location.search,
-                hash: window.location.hash,
-                userAgent: navigator.userAgent
+                hash: window.location.hash
             });
 
             // Google может вернуть токен в URL, попробуем обработать его
@@ -105,16 +127,13 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
             const accessToken = hashParams.get('access_token');
 
             if (error) {
-                console.error('❌ OAuth error in redirect:', error, {
-                    urlParams: Object.fromEntries(urlParams),
-                    hashParams: Object.fromEntries(hashParams)
-                });
+                addLog('❌ OAuth error in redirect:', { error, urlParams: Object.fromEntries(urlParams), hashParams: Object.fromEntries(hashParams) });
                 setAuthError(`Ошибка авторизации: ${error}. Попробуйте еще раз.`);
             } else if (accessToken) {
-                console.log('🔵 Found access token in hash, this should not happen with redirect mode');
+                addLog('🔵 Found access token in hash, this should not happen with redirect mode');
                 setAuthError("Неожиданный формат ответа. Попробуйте еще раз.");
             } else if (code) {
-                console.log('🔵 Found authorization code, processing...', { code: code.substring(0, 20) + '...' });
+                addLog('🔵 Found authorization code, processing...', { code: code.substring(0, 20) + '...' });
                 // В redirect режиме с кодом нужно обменять код на токен через backend
                 // Пока показываем ошибку с предложением использовать popup режим
                 setAuthError("Авторизация в Telegram браузере не поддерживается. Откройте приложение в обычном браузере.");
@@ -124,15 +143,10 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
 
     // --- Standard Google Sign-In Logic ---
     const handleCredentialResponse = useCallback(async (response: any) => {
-        console.log('🔵 Google Sign-In callback received:', response);
+        addLog('🔵 Google Sign-In callback received:', response);
 
         if (!response.credential) {
-            console.error("❌ Google Sign-In failed: No credential returned.", {
-                response,
-                isTelegramBrowser,
-                userAgent: navigator.userAgent,
-                location: window.location.href
-            });
+            addLog("❌ Google Sign-In failed: No credential returned.", { response });
             const errorMsg = isTelegramBrowser
                 ? "Ошибка авторизации в Telegram браузере. Попробуйте открыть в обычном браузере или обновить страницу."
                 : "Произошла ошибка при входе через Google. Попробуйте еще раз.";
@@ -157,30 +171,22 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
                 
                 if (existingState && existingState.selectedDifficulty) {
                     // Если есть сохраненное состояние - сразу запускаем игру
-                    console.log('✅ Found existing game state, skipping level selection');
+                    addLog('✅ Found existing game state, skipping level selection');
                     onStart(user);
                 } else {
                     // Новый пользователь - показываем экран выбора уровня
-                    console.log('🆕 New user, showing level selection');
+                    addLog('🆕 New user, showing level selection');
                     setTempUser(user);
                 }
             } else {
-                 console.error("❌ Failed to parse user from Google credential.", {
-                     userObject,
-                     response,
-                     isTelegramBrowser
-                 });
+                 addLog("❌ Failed to parse user from Google credential.", { userObject });
                  const errorMsg = isTelegramBrowser
                      ? "Не удалось получить данные пользователя в Telegram браузере. Попробуйте другой браузер."
                      : "Не удалось получить данные пользователя из ответа Google.";
                  setAuthError(errorMsg);
             }
         } catch (error) {
-            console.error("❌ Error processing Google credential:", error, {
-                response,
-                isTelegramBrowser,
-                userAgent: navigator.userAgent
-            });
+            addLog("❌ Error processing Google credential:", { error });
             const errorMsg = isTelegramBrowser
                 ? "Ошибка обработки данных в Telegram браузере. Попробуйте обычный браузер."
                 : "Произошла ошибка при обработке данных пользователя.";
@@ -192,22 +198,20 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
         if (isAiStudio || isStarting || tempUser || (isTelegramBrowser && authError)) return; // Не инициализируем если уже авторизованы или есть ошибка в Telegram
 
         const initializeGsi = () => {
-            console.log('🚀 Initializing Google Sign-In', {
+            addLog('🚀 Initializing Google Sign-In', {
                 hasGoogle: !!window.google,
                 hasButtonRef: !!googleButtonRef.current,
-                tempUser: !!tempUser,
-                isTelegramBrowser,
-                userAgent: navigator.userAgent
+                tempUser: !!tempUser
             });
 
             if (window.google && googleButtonRef.current && !tempUser) {
                 if (googleButtonRef.current.childElementCount > 0) {
-                    console.log('⚠️ Google button already rendered, skipping');
+                    addLog('⚠️ Google button already rendered, skipping');
                     return;
                 }
 
                 if (!GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID.startsWith("ВАШ")) {
-                    console.error('❌ Google Client ID not configured');
+                    addLog('❌ Google Client ID not configured');
                     setAuthError("Ошибка конфигурации: Google Client ID не найден. Откройте файл 'config.ts' и вставьте ваш ключ.");
                     return;
                 }
@@ -231,19 +235,11 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
                 if (isTelegramBrowser) {
                     config.ux_mode = 'redirect';
                     config.redirect_uri = window.location.origin;
-                    console.log('🔵 Using redirect mode for Telegram browser', {
-                        config,
-                        userAgent: navigator.userAgent,
-                        location: window.location.href
-                    });
+                    addLog('🔵 Using redirect mode for Telegram browser', { config });
 
                     // Добавляем timeout для Telegram браузера
                     authTimeout = setTimeout(() => {
-                        console.log('⏰ Telegram auth timeout after 30s', {
-                            isTelegramBrowser,
-                            userAgent: navigator.userAgent,
-                            location: window.location.href
-                        });
+                        addLog('⏰ Telegram auth timeout after 30s');
                         const timeoutMsg = "Вход был отменен или истекло время ожидания (30 сек). Попробуйте еще раз.";
                         setAuthError(timeoutMsg);
                         // Очищаем Google кнопку при таймауте
@@ -254,14 +250,14 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
                     }, 30000); // 30 секунд
                 }
 
-                console.log('🔧 Initializing Google with config:', config);
+                addLog('🔧 Initializing Google with config:', config);
                 window.google.accounts.id.initialize(config);
 
                 // Добавляем обработку ошибок
                 window.google.accounts.id.disableAutoSelect();
-                console.log('✅ Google Sign-In initialized successfully');
+                addLog('✅ Google Sign-In initialized successfully');
 
-                console.log('🎨 Rendering Google button...');
+                addLog('🎨 Rendering Google button...');
                 window.google.accounts.id.renderButton(
                     googleButtonRef.current,
                     {
@@ -274,22 +270,22 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
                         width: '280'
                     }
                 );
-                console.log('✅ Google button rendered');
+                addLog('✅ Google button rendered');
             }
         }
 
         if (!window.google) {
-            console.log('⏳ Waiting for Google SDK to load...');
+            addLog('⏳ Waiting for Google SDK to load...');
             const interval = setInterval(() => {
                 if (window.google) {
-                    console.log('✅ Google SDK loaded, initializing...');
+                    addLog('✅ Google SDK loaded, initializing...');
                     clearInterval(interval);
                     initializeGsi();
                 }
             }, 100);
             return () => clearInterval(interval);
         } else {
-            console.log('✅ Google SDK already loaded');
+            addLog('✅ Google SDK already loaded');
             initializeGsi();
         }
     }, [isStarting, handleCredentialResponse, isAiStudio, tempUser]);
@@ -331,11 +327,23 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
         }
 
         if (authError) {
+            // Получаем логи из localStorage для отображения
+            const getDebugLogs = () => {
+                try {
+                    const logs = JSON.parse(localStorage.getItem('auth-debug-logs') || '[]');
+                    return logs.slice(-10); // Показываем последние 10 логов
+                } catch (e) {
+                    return [];
+                }
+            };
+
+            const debugLogs = getDebugLogs();
             const debugInfo = isTelegramBrowser ? `
 Browser: ${navigator.userAgent}
 Location: ${window.location.href}
 Telegram: ${isTelegramBrowser}
 Time: ${new Date().toISOString()}
+Logs: ${debugLogs.length} entries
             `.trim() : null;
 
             return (
@@ -356,6 +364,53 @@ Time: ${new Date().toISOString()}
                             }}>
                                 {debugInfo}
                             </pre>
+                        </details>
+                    )}
+
+                    {debugLogs.length > 0 && (
+                        <details style={{fontSize: '0.7rem', textAlign: 'left', marginTop: '0.5rem'}}>
+                            <summary style={{cursor: 'pointer', fontWeight: 'bold'}}>🔍 Логи авторизации ({debugLogs.length})</summary>
+                            <button
+                                onClick={() => {
+                                    localStorage.removeItem('auth-debug-logs');
+                                    window.location.reload();
+                                }}
+                                style={{
+                                    marginTop: '0.25rem',
+                                    padding: '0.25rem 0.5rem',
+                                    fontSize: '0.6rem',
+                                    backgroundColor: 'rgba(255,255,255,0.1)',
+                                    border: '1px solid rgba(255,255,255,0.3)',
+                                    borderRadius: '3px',
+                                    color: 'white',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                🗑️ Очистить логи
+                            </button>
+                            <div style={{
+                                backgroundColor: 'rgba(0,0,0,0.1)',
+                                padding: '0.5rem',
+                                borderRadius: '4px',
+                                marginTop: '0.25rem',
+                                maxHeight: '200px',
+                                overflow: 'auto',
+                                fontSize: '0.6rem'
+                            }}>
+                                {debugLogs.map((log: any, index: number) => (
+                                    <div key={index} style={{marginBottom: '0.25rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.25rem'}}>
+                                        <div style={{color: '#888', fontSize: '0.5rem'}}>
+                                            {new Date(log.timestamp).toLocaleTimeString()}
+                                        </div>
+                                        <div style={{fontWeight: 'bold'}}>{log.message}</div>
+                                        {log.data && (
+                                            <pre style={{margin: '0.25rem 0', fontSize: '0.5rem', whiteSpace: 'pre-wrap'}}>
+                                                {JSON.stringify(log.data, null, 2)}
+                                            </pre>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
                         </details>
                     )}
                 </div>
