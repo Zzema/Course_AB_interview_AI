@@ -46,27 +46,26 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
 
     // Система логирования для отладки
     const addLog = (message: string, data?: any) => {
-        const logEntry = {
-            timestamp: new Date().toISOString(),
-            message,
-            data,
-            userAgent: navigator.userAgent,
-            location: window.location.href,
-            isTelegramBrowser
-        };
-
-        // Логируем в консоль
-        console.log(message, data || '');
-
-        // Сохраняем в localStorage для Telegram браузера
         try {
+            // Логируем в консоль
+            console.log(message, data || '');
+
+            // Сохраняем в localStorage для Telegram браузера
+            const logEntry = {
+                timestamp: new Date().toISOString(),
+                message,
+                data: data ? JSON.stringify(data).substring(0, 200) : null, // Ограничиваем размер
+                isTelegramBrowser
+            };
+
             const logs = JSON.parse(localStorage.getItem('auth-debug-logs') || '[]');
             logs.push(logEntry);
             // Оставляем только последние 20 логов
             if (logs.length > 20) logs.shift();
             localStorage.setItem('auth-debug-logs', JSON.stringify(logs));
         } catch (e) {
-            console.error('Failed to save log to localStorage:', e);
+            // Если логирование сломалось, используем только консоль
+            console.error('Logging failed:', message, e);
         }
     };
 
@@ -143,19 +142,22 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
 
     // --- Standard Google Sign-In Logic ---
     const handleCredentialResponse = useCallback(async (response: any) => {
-        addLog('🔵 Google Sign-In callback received:', response);
-
-        if (!response.credential) {
-            addLog("❌ Google Sign-In failed: No credential returned.", { response });
-            const errorMsg = isTelegramBrowser
-                ? "Ошибка авторизации в Telegram браузере. Попробуйте открыть в обычном браузере или обновить страницу."
-                : "Произошла ошибка при входе через Google. Попробуйте еще раз.";
-            setAuthError(errorMsg);
-            return;
-        }
-        
         try {
+            addLog('🔵 Google Sign-In callback received:', response);
+
+            if (!response.credential) {
+                addLog("❌ Google Sign-In failed: No credential returned.", { response });
+                const errorMsg = isTelegramBrowser
+                    ? "Ошибка авторизации в Telegram браузере. Попробуйте открыть в обычном браузере или обновить страницу."
+                    : "Произошла ошибка при входе через Google. Попробуйте еще раз.";
+                setAuthError(errorMsg);
+                return;
+            }
+
+            addLog('🔄 Processing credential...');
             const userObject: any = decodeJwt(response.credential);
+            addLog('🔄 Decoded JWT:', { hasEmail: !!userObject?.email, hasName: !!userObject?.name });
+
             if (userObject && userObject.email) {
                 const user: User = {
                     name: userObject.name,
@@ -164,11 +166,14 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
                     family_name: userObject.family_name,
                     picture: userObject.picture,
                 };
-                
+
+                addLog('👤 User data extracted:', { email: user.email, name: user.given_name });
+
                 // Проверяем есть ли сохраненное состояние
+                addLog('🔍 Checking game state...');
                 const { fetchGameState } = await import('../lib/api');
                 const existingState = await fetchGameState(user.email);
-                
+
                 if (existingState && existingState.selectedDifficulty) {
                     // Если есть сохраненное состояние - сразу запускаем игру
                     addLog('✅ Found existing game state, skipping level selection');
@@ -186,7 +191,7 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
                  setAuthError(errorMsg);
             }
         } catch (error) {
-            addLog("❌ Error processing Google credential:", { error });
+            addLog("❌ Error processing Google credential:", { error: error?.toString() });
             const errorMsg = isTelegramBrowser
                 ? "Ошибка обработки данных в Telegram браузере. Попробуйте обычный браузер."
                 : "Произошла ошибка при обработке данных пользователя.";
@@ -322,9 +327,10 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
     };
     
     const renderContent = () => {
-        if (isStarting) {
-            return <p style={{textAlign: 'center', color: 'var(--text-secondary)'}}>Загрузка сессии...</p>;
-        }
+        try {
+            if (isStarting) {
+                return <p style={{textAlign: 'center', color: 'var(--text-secondary)'}}>Загрузка сессии...</p>;
+            }
 
         if (authError) {
             // Получаем логи из localStorage для отображения
@@ -565,6 +571,29 @@ Logs: ${debugLogs.length} entries
                 ></div>
             </div>
         );
+        } catch (error) {
+            console.error('Render error:', error);
+            return (
+                <div style={{color: 'var(--error-color)', textAlign: 'center', padding: '2rem'}}>
+                    <p style={{fontWeight: 'bold'}}>Произошла ошибка рендеринга</p>
+                    <p>Попробуйте перезагрузить страницу</p>
+                    <button
+                        onClick={() => window.location.reload()}
+                        style={{
+                            marginTop: '1rem',
+                            padding: '0.5rem 1rem',
+                            backgroundColor: 'var(--primary-color)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        Перезагрузить
+                    </button>
+                </div>
+            );
+        }
     };
 
     return (
