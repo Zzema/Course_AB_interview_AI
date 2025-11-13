@@ -2,7 +2,7 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { GoogleGenAI, Type } from '@google/genai';
 import { GameState, User, Feedback, Category, KeyPoint } from '../types';
 import { QUESTION_DATABASE, CATEGORIES_CONFIG, KEY_POINT_TO_CATEGORY_MAP } from '../data/constants';
-import { GEMINI_PROXY_URL, GEMINI_API_KEY } from '../config/config';
+import { GEMINI_PROXY_URL } from '../config/config';
 import { styles } from '../styles';
 import { createInitialGameState } from '../lib/api';
 import FeedbackOverlay from './FeedbackOverlay';
@@ -291,9 +291,8 @@ const GameScreen: React.FC<GameScreenProps> = ({ user, onLogout, gameState, setG
                 Верни ТОЛЬКО JSON с полями: overallScore (число 0-10), evaluation (объект с массивами strengths и weaknesses), categoryBreakdown (массив объектов с полями category, score, comment).
             `;
 
-            // Запрос к Gemini API (прямой вызов с ключом)
-            const apiUrl = `${GEMINI_PROXY_URL}?key=${GEMINI_API_KEY}`;
-            const proxyResponse = await fetch(apiUrl, {
+            // Запрос через Railway proxy
+            const proxyResponse = await fetch(GEMINI_PROXY_URL, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
