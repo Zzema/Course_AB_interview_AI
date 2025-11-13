@@ -36,7 +36,8 @@ function App() {
         if (isDemoMode()) {
             console.log('🎭 Demo mode detected');
             const demoUser = getDemoUser();
-            handleLogin(demoUser);
+            // Автоматически выбираем junior для демо-пользователей
+            handleLogin(demoUser, 'junior');
             return;
         }
         
