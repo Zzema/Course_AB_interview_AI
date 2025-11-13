@@ -8,6 +8,7 @@ import ModuleDetailScreen from './components/ModuleDetailScreen';
 import * as api from './lib/api';
 import { GameState, Session, User } from './types';
 import { checkAndUpdateSeries, getCurrentDateString } from './lib/activitySeriesManager';
+import { isDemoMode, getDemoUser } from './lib/demoAccess';
 
 // Define google on the window object for TypeScript
 declare global {
@@ -31,6 +32,14 @@ function App() {
     }, [view]);
 
     useEffect(() => {
+        // Check for demo mode
+        if (isDemoMode()) {
+            console.log('🎭 Demo mode detected');
+            const demoUser = getDemoUser();
+            handleLogin(demoUser);
+            return;
+        }
+        
         const savedUserString = localStorage.getItem('ab-hero-user');
         if (savedUserString) {
             try {

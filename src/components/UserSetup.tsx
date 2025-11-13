@@ -357,6 +357,50 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
                 fontSize: isMobile ? '0.9rem' : '1rem'
             }}>Твой персональный AI-тренажер для подготовки к собеседованиям</p>
             {renderContent()}
+            
+            {/* Demo Mode Link */}
+            <div style={{
+                marginTop: '2rem',
+                textAlign: 'center' as const,
+                padding: '1rem',
+                background: 'rgba(102, 126, 234, 0.1)',
+                borderRadius: '8px',
+                border: '1px solid rgba(102, 126, 234, 0.3)'
+            }}>
+                <p style={{
+                    fontSize: '0.9rem',
+                    color: '#667eea',
+                    marginBottom: '0.5rem',
+                    fontWeight: '500'
+                }}>
+                    🎭 Хочешь протестировать приложение?
+                </p>
+                <a 
+                    href="?demo=true" 
+                    style={{
+                        display: 'inline-block',
+                        padding: '0.5rem 1rem',
+                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        color: 'white',
+                        borderRadius: '6px',
+                        textDecoration: 'none',
+                        fontSize: '0.9rem',
+                        fontWeight: '600',
+                        transition: 'transform 0.2s',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+                    onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                >
+                    Войти в демо-режиме
+                </a>
+                <p style={{
+                    fontSize: '0.75rem',
+                    color: '#999',
+                    marginTop: '0.5rem'
+                }}>
+                    Без регистрации, с сохранением прогресса
+                </p>
+            </div>
         </div>
     );
 };
