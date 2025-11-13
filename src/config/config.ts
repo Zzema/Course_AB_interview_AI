@@ -13,14 +13,15 @@ export const GOOGLE_CLIENT_ID = "453147732441-5frhp2rmktdnsdml43eqmj37us85sgov.a
 // Ключ теперь хранится на сервере для безопасности и обхода региональных ограничений
 // ============================================================================
 
-export const GEMINI_API_KEY = ""; // Больше не используется в клиентском коде
+// Временно используем прямой API ключ (Railway proxy не работает)
+export const GEMINI_API_KEY = "AIzaSyCYObs7UDj-8RPLl0gfXXPlb_cSU6_h3JI";
 
 // ============================================================================
-// RAILWAY PROXY
+// RAILWAY PROXY (временно отключен - не отвечает)
 // ============================================================================
 // URL Railway прокси-сервера для Gemini API
 // После деплоя на Railway замените на ваш URL:
 // https://your-app-name.up.railway.app/api/generate
 // ============================================================================
 
-export const GEMINI_PROXY_URL = "https://courseabinterviewai-production.up.railway.app/api/generate";
+export const GEMINI_PROXY_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent";

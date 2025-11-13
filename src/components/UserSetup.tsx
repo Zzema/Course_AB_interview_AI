@@ -75,9 +75,9 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
         if (!response.credential) {
             console.error("Google Sign-In failed: No credential returned.");
             setAuthError("Произошла ошибка при входе через Google. Попробуйте еще раз.");
-            return;
-        }
-        
+                return;
+            }
+
         try {
             const userObject: any = decodeJwt(response.credential);
             if (userObject && userObject.email) {
@@ -87,13 +87,13 @@ const UserSetup: React.FC<UserSetupProps> = ({ onStart, isStarting }) => {
                     given_name: userObject.given_name,
                     family_name: userObject.family_name,
                     picture: userObject.picture,
-                };
-                
-                // Проверяем есть ли сохраненное состояние
-                const { fetchGameState } = await import('../lib/api');
+            };
+
+            // Проверяем есть ли сохраненное состояние
+            const { fetchGameState } = await import('../lib/api');
                 const existingState = await fetchGameState(user.email);
-                
-                if (existingState && existingState.selectedDifficulty) {
+
+            if (existingState && existingState.selectedDifficulty) {
                     // Если есть сохраненное состояние - сразу запускаем игру
                     console.log('✅ Found existing game state, skipping level selection');
                     onStart(user);
